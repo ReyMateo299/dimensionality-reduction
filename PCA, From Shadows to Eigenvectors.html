@@ -1,0 +1,1410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PCA, From Shadows to Eigenvectors</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,300..900&family=STIX+Two+Text:ital,wght@0,400..700;1,400..700&display=swap" rel="stylesheet">
+<style>
+:root{
+  /* Layout: a left-aligned reading column (~66ch) with figure plates that run wider than the text; a sticky chapter rail on wide screens tracks the reader's progress through the tasks. */
+  --paper:#EEF1F4;
+  --plate:#FBFCFD;
+  --ink:#17202B;
+  --ink-2:#556170;
+  --rule:#CDD5DE;
+  --grid:#E5EAF0;
+  --pc1:#B5179E;
+  --pc2:#0F8A5F;
+  --pos:#2563C9;
+  --neg:#D9661F;
+  --display:"Archivo","Helvetica Neue",Arial,sans-serif;
+  --body:"STIX Two Text","STIX Two",Cambria,Georgia,serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --paper:#10161E; --plate:#1A222D; --ink:#E6EBF1; --ink-2:#9AA6B4; --rule:#334050; --grid:#232D39;
+    --pc1:#D946C0; --pc2:#22A873; --pos:#4F88E0; --neg:#DB7A33;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#10161E; --plate:#1A222D; --ink:#E6EBF1; --ink-2:#9AA6B4; --rule:#334050; --grid:#232D39;
+  --pc1:#D946C0; --pc2:#22A873; --pos:#4F88E0; --neg:#DB7A33;
+  color-scheme:dark;
+}
+
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--body);font-size:1.125rem;line-height:1.65;font-kerning:normal}
+a{color:inherit}
+:focus-visible{outline:2px solid var(--pc1);outline-offset:2px;border-radius:2px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+/* ---------- page frame ---------- */
+.page{display:grid;grid-template-columns:minmax(0,1fr);gap:0 48px;max-width:1320px;margin:0 auto;padding:0 20px}
+@media (min-width:1180px){.page{grid-template-columns:210px minmax(0,1fr)}}
+.rail{display:none}
+@media (min-width:1180px){
+  .rail{display:block;position:sticky;top:0;align-self:start;height:100vh;padding:40px 0;font-family:var(--display);font-size:.875rem;line-height:1.35}
+}
+.rail p{margin:0 0 12px;color:var(--ink-2);font-size:.8125rem}
+.rail ol{list-style:none;margin:0;padding:0;display:grid;gap:2px}
+.rail a{display:grid;grid-template-columns:22px 1fr;gap:0 6px;padding:7px 8px;border-radius:6px;text-decoration:none;color:var(--ink-2)}
+.rail a:hover{background:var(--plate);color:var(--ink)}
+.rail a.here{color:var(--ink);background:var(--plate)}
+.rail .n{font-variant-numeric:tabular-nums;font-weight:600}
+.pips{grid-column:2;display:flex;gap:4px;margin-top:5px}
+.pip{width:8px;height:8px;border-radius:50%;border:1.5px solid var(--rule)}
+.pip.on{background:var(--pc2);border-color:var(--pc2)}
+.rail .total{margin-top:18px;padding:0 8px;color:var(--ink-2);font-size:.8125rem}
+
+main{min-width:0;padding-bottom:96px}
+
+/* ---------- type ---------- */
+h1,h2,h3{font-family:var(--display);text-wrap:balance;margin:0}
+h1{font-stretch:125%;font-weight:800;font-size:clamp(2.35rem,5.6vw,4.25rem);line-height:.98;letter-spacing:-.012em}
+h2{font-stretch:118%;font-weight:750;font-size:clamp(1.6rem,3vw,2.1rem);line-height:1.08;letter-spacing:-.005em}
+h3{font-weight:650;font-size:1.0625rem;line-height:1.3}
+.chapter-head{display:grid;grid-template-columns:auto 1fr;gap:4px 18px;align-items:baseline;max-width:44rem;margin-bottom:22px}
+.chapter-head .num{font-family:var(--display);font-stretch:62%;font-weight:300;font-size:3.4rem;line-height:.8;color:var(--ink-2);font-variant-numeric:tabular-nums}
+.prose{max-width:41rem}
+.prose p{margin:0 0 1em}
+.prose ul,.prose ol{margin:0 0 1em;padding-left:1.3em}
+.prose li{margin:.25em 0}
+.lede{font-size:1.25rem;line-height:1.55}
+em,i{font-style:italic}
+.v{font-style:italic}
+.key{font-family:var(--display);font-weight:600;font-size:.95em}
+.c1{color:var(--pc1)} .c2{color:var(--pc2)} .cp{color:var(--pos)} .cn{color:var(--neg)}
+
+section.chapter{padding:72px 0 8px;scroll-margin-top:12px}
+section.chapter + section.chapter{border-top:1px solid var(--rule);margin-top:48px}
+
+/* ---------- math ---------- */
+.math{font-family:var(--body);font-size:1.15rem;margin:1.1em 0;padding:.35em 0 .35em 1.1em;border-left:3px solid var(--rule);overflow-x:auto;line-height:1.9}
+.math .note{display:block;font-size:.95rem;color:var(--ink-2);font-style:normal;line-height:1.5}
+.frac{display:inline-flex;flex-direction:column;vertical-align:middle;text-align:center;line-height:1.15;margin:0 .15em}
+.frac>span:first-child{border-bottom:1px solid currentColor;padding:0 .2em}
+.frac>span:last-child{padding:0 .2em}
+.steps{counter-reset:s;list-style:none;padding:0;margin:1em 0;display:grid;gap:12px;max-width:41rem}
+.steps>li{counter-increment:s;display:grid;grid-template-columns:2.2rem 1fr;gap:0 10px}
+.steps>li::before{content:counter(s);font-family:var(--display);font-weight:700;font-variant-numeric:tabular-nums;color:var(--ink-2);text-align:right}
+
+/* ---------- hero ---------- */
+.hero{display:grid;gap:32px 48px;padding:56px 0 24px;align-items:start}
+@media (min-width:980px){.hero{grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr)}}
+.hero .lede{margin:24px 0 16px;max-width:34rem}
+.hero .how{font-size:1rem;color:var(--ink-2);max-width:34rem;margin:0}
+
+/* ---------- figure plate ---------- */
+.fig{background:var(--plate);border:1px solid var(--rule);border-radius:10px;margin:28px 0 32px;display:grid;grid-template-columns:minmax(0,1fr);max-width:1040px}
+@media (min-width:860px){.fig{grid-template-columns:minmax(0,1.2fr) minmax(280px,1fr)}}
+.hero .fig{margin:0}
+@media (min-width:980px){.hero .fig{grid-template-columns:minmax(0,1fr)}}
+.stage{position:relative;padding:12px;min-width:0}
+.cv{display:block;width:100%;aspect-ratio:1/1;max-height:560px;touch-action:none;cursor:grab;border-radius:6px}
+.cv:active{cursor:grabbing}
+.cv.static{cursor:default}
+.panel{padding:18px 20px 20px;border-top:1px solid var(--rule);font-family:var(--display);font-size:.9375rem;line-height:1.45;display:grid;gap:16px;align-content:start;min-width:0}
+@media (min-width:860px){.fig>.panel{border-top:0;border-left:1px solid var(--rule)}}
+.hero .fig>.panel{border-left:0;border-top:1px solid var(--rule)}
+.figcap{font-family:var(--display);font-size:.8125rem;color:var(--ink-2);margin:0;padding:0 12px 10px}
+.figcap b{color:var(--ink);font-weight:650}
+
+.try h3{margin-bottom:8px}
+.missions{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.missions li{display:grid;grid-template-columns:18px 1fr;gap:10px;align-items:start}
+.box{width:18px;height:18px;border:1.5px solid var(--ink-2);border-radius:4px;margin-top:1px;position:relative;transition:background .2s,border-color .2s}
+.missions li.done .box{background:var(--pc2);border-color:var(--pc2)}
+.missions li.done .box::after{content:"";position:absolute;left:5px;top:1px;width:5px;height:10px;border:solid var(--plate);border-width:0 2px 2px 0;transform:rotate(45deg)}
+.missions li.done .txt{color:var(--ink-2)}
+.coach{margin:0;padding:10px 12px;border-radius:6px;background:var(--paper);font-size:.9375rem;line-height:1.45;min-height:3.2em}
+.coach strong{font-weight:650}
+
+.ctrl{display:grid;gap:6px}
+.ctrl label,.lbl{font-weight:600;font-size:.875rem}
+.ctrl .row{display:flex;align-items:center;gap:10px}
+.ctrl output{font-variant-numeric:tabular-nums;min-width:4.5em;text-align:right;color:var(--ink-2)}
+input[type=range]{flex:1;accent-color:var(--pc1);min-width:0}
+.btns{display:flex;flex-wrap:wrap;gap:8px}
+button{font:inherit;font-family:var(--display);font-weight:600;font-size:.875rem;color:var(--ink);background:var(--plate);border:1.5px solid var(--ink);border-radius:999px;padding:7px 14px;cursor:pointer}
+button:hover{background:var(--paper)}
+button.primary{background:var(--ink);color:var(--plate)}
+button.primary:hover{opacity:.88}
+button:disabled{opacity:.4;cursor:default}
+.seg{display:inline-flex;justify-self:start;border:1.5px solid var(--ink);border-radius:999px;overflow:hidden}
+.seg button{border:0;border-radius:0;padding:6px 12px;background:transparent}
+.seg button+button{border-left:1.5px solid var(--ink)}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--plate)}
+.ctrl-grid{display:grid;gap:12px}
+
+.readout{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;font-variant-numeric:tabular-nums;font-size:.9rem;margin:0}
+.readout dt{color:var(--ink-2)}
+.readout dd{margin:0;text-align:right;font-weight:600}
+
+.split{display:flex;height:12px;border-radius:3px;overflow:hidden;background:var(--grid);gap:2px}
+.split span{display:block;height:100%;border-radius:2px}
+.split .a{background:var(--pc1)}
+.split .b{background:var(--rule)}
+.split .b.c2{background:var(--pc2)}
+.split-legend{display:flex;justify-content:space-between;gap:10px;font-size:.8125rem;color:var(--ink-2);margin-top:6px;font-variant-numeric:tabular-nums}
+.sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px}
+
+/* matrices */
+.mats{display:flex;flex-wrap:wrap;gap:18px}
+.matwrap{display:grid;gap:6px}
+.matwrap.used .mattitle::after{content:"used for PCA";margin-left:8px;font-size:.75rem;font-weight:600;color:var(--pc1)}
+.mattitle{font-weight:600;font-size:.875rem}
+.matrix{display:inline-grid;grid-template-columns:auto auto auto;gap:4px 6px;align-items:center;font-variant-numeric:tabular-nums}
+.matrix .rh,.matrix .ch{font-size:.75rem;color:var(--ink-2);text-align:center}
+.matrix .rh{text-align:right;padding-right:4px}
+.mbody{grid-column:2/4;grid-row:2/4;display:grid;grid-template-columns:1fr 1fr;gap:4px 8px;padding:4px 10px;border-left:2px solid var(--ink);border-right:2px solid var(--ink);border-radius:5px}
+.cell{text-align:right;padding:3px 6px;border-radius:4px;font-weight:600;font-size:.95rem;min-width:4.6em}
+.cell small{display:block;font-weight:400;font-size:.6875rem;color:var(--ink-2)}
+.cell.d{background:color-mix(in oklab,var(--pc2) 14%,transparent)}
+.cell.o{background:color-mix(in oklab,var(--pos) 12%,transparent)}
+.cell.o.neg{background:color-mix(in oklab,var(--neg) 16%,transparent)}
+
+.mini-table{border-collapse:collapse;font-variant-numeric:tabular-nums;font-size:.875rem;width:100%}
+.mini-table th,.mini-table td{padding:4px 6px;text-align:right;border-bottom:1px solid var(--grid)}
+.mini-table th{font-weight:600;color:var(--ink-2)}
+.mini-table td:first-child,.mini-table th:first-child{text-align:left}
+.mini-table .dim{opacity:.35;text-decoration:line-through}
+
+.load{display:grid;grid-template-columns:7.5em 1fr 3.4em;gap:6px 10px;align-items:center;font-size:.875rem;font-variant-numeric:tabular-nums}
+.load .bar{height:10px;background:var(--grid);border-radius:3px;position:relative;overflow:hidden}
+.load .bar span{position:absolute;top:0;bottom:0;left:0;background:var(--pc1);border-radius:3px}
+.load .val{text-align:right;font-weight:600}
+
+/* compare table */
+.compare-wrap{overflow-x:auto;max-width:1040px;margin:24px 0}
+table.compare{border-collapse:collapse;font-family:var(--display);font-size:.9375rem;line-height:1.4;min-width:620px;background:var(--plate);border:1px solid var(--rule);border-radius:10px;overflow:hidden}
+table.compare th,table.compare td{padding:10px 14px;text-align:left;vertical-align:top;border-bottom:1px solid var(--grid)}
+table.compare thead th{font-weight:700;border-bottom:1px solid var(--rule)}
+table.compare tbody th{font-weight:600;color:var(--ink-2);width:24%}
+table.compare tr:last-child>*{border-bottom:0}
+
+/* scree svg */
+.svgfig{display:block;width:100%;height:auto}
+.svgfig text{font-family:var(--display);fill:var(--ink-2);font-size:12px}
+.svgfig .val{fill:var(--ink);font-weight:600}
+.svgfig .gridl{stroke:var(--grid)}
+.svgfig .base{stroke:var(--rule);stroke-width:1.5}
+.svgfig .kept{fill:var(--pc1)}
+.svgfig .dropped{fill:var(--rule)}
+.svgfig .cum{fill:none;stroke:var(--ink);stroke-width:2}
+.svgfig .cumdot{fill:var(--ink);stroke:var(--plate);stroke-width:2}
+.svgfig .thr{stroke:var(--ink-2);stroke-dasharray:4 4}
+.svgfig .hit{fill:transparent;cursor:pointer}
+.svgfig .hit:focus{outline:none}
+.svgfig .hit:focus-visible{stroke:var(--pc1);stroke-width:2}
+.heat-wrap{overflow-x:auto}
+
+/* quiz */
+.quiz{display:grid;gap:20px;max-width:46rem;margin-top:20px}
+.q{background:var(--plate);border:1px solid var(--rule);border-radius:10px;padding:18px 20px;font-family:var(--display);font-size:.9375rem}
+.q p.ask{margin:0 0 12px;font-weight:600;font-size:1rem;line-height:1.4}
+.opts{display:grid;gap:8px}
+.opts button{text-align:left;border-radius:8px;font-weight:500;border-width:1.5px;border-color:var(--rule);line-height:1.4}
+.opts button.right{border-color:var(--pc2);background:color-mix(in oklab,var(--pc2) 12%,var(--plate))}
+.opts button.wrong{border-color:var(--neg);background:color-mix(in oklab,var(--neg) 10%,var(--plate))}
+.q .fb{margin:12px 0 0;color:var(--ink-2);line-height:1.45}
+.q .fb:empty{display:none}
+
+.recipe{max-width:46rem}
+.callout{max-width:41rem;margin:20px 0;padding:14px 18px;border-radius:8px;background:var(--plate);border:1px solid var(--rule);font-size:1.0625rem}
+.callout p{margin:0}
+.callout p+p{margin-top:.6em}
+
+footer{max-width:41rem;color:var(--ink-2);font-size:.95rem;padding-top:40px}
+
+@media (max-width:520px){
+  body{font-size:1.0625rem}
+  .page{padding:0 16px}
+  .chapter-head .num{font-size:2.6rem}
+  .panel{padding:16px}
+  .cell{min-width:3.8em;font-size:.875rem}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="page">
+<nav class="rail" aria-label="Chapters">
+  <p>Chapters and tasks</p>
+  <ol id="rail-list"></ol>
+  <div class="total" id="rail-total"></div>
+</nav>
+
+<main>
+<!-- ================= HERO ================= -->
+<section class="chapter hero" id="shadow" data-title="The shadow game" data-n="0" style="border-top:0;margin-top:0">
+  <div>
+    <h1>Find the angle where the shadow is longest.</h1>
+    <p class="lede">Principal component analysis (PCA) describes data with fewer numbers while losing as little as possible. Before any math, try it by hand. Each dot is one day: the high temperature in two neighboring towns. Turn the line and every dot casts a shadow onto it.</p>
+    <p class="how">How to use this guide: every figure has a short <span class="key">Try this</span> list. Do the tasks in order. The note under each list reacts to what you do, and the chapter list on the left fills in as you finish tasks.</p>
+  </div>
+  <figure class="fig" style="margin:0">
+    <div class="stage">
+      <canvas class="cv" id="cv-hero" aria-label="Scatter plot of 40 days of temperatures in Town A and Town B, with a line you can rotate. Each point drops a perpendicular onto the line."></canvas>
+      <p class="figcap"><b>Figure 1.</b> Drag on the plot, or use the slider, to turn the line. Colored dots on the line are the shadows.</p>
+    </div>
+    <div class="panel">
+      <div class="ctrl">
+        <label for="hero-angle">Line angle</label>
+        <div class="row"><input type="range" id="hero-angle" min="0" max="179.5" step="0.5" value="5"><output id="hero-angle-out" for="hero-angle">5°</output></div>
+      </div>
+      <div class="try">
+        <h3>Try this</h3>
+        <ol class="missions">
+          <li data-m="hero-1"><span class="box" aria-hidden="true"></span><span class="txt">Turn the line until the shadows spread out as far as they can.</span></li>
+          <li data-m="hero-2"><span class="box" aria-hidden="true"></span><span class="txt">Now find the angle where the shadows bunch up the most.</span></li>
+        </ol>
+      </div>
+      <p class="coach" id="hero-coach" aria-live="polite"></p>
+      <div>
+        <div class="split" aria-hidden="true"><span class="a" id="hero-kept"></span><span class="b" id="hero-lost"></span></div>
+        <div class="split-legend"><span><span class="sw" style="background:var(--pc1)"></span>Spread along the line <b id="hero-kv"></b></span><span>Lost off the line <b id="hero-lv"></b></span></div>
+      </div>
+    </div>
+  </figure>
+</section>
+
+<!-- ================= 1 WHY ================= -->
+<section class="chapter" id="why" data-title="Why fewer dimensions?" data-n="1">
+  <div class="chapter-head"><span class="num">1</span><h2>Why describe data with fewer numbers?</h2></div>
+  <div class="prose">
+    <p>A <em>dimension</em> is one column in your table: one feature. The temperature data has two. Real ML datasets often have hundreds: pixels in an image, words in a document, sensor readings, survey answers.</p>
+    <p>Many of those columns repeat each other. If Town A is hot, Town B is almost always hot too, so the second column tells you little that the first did not. <strong>Dimensionality reduction</strong> finds a smaller set of new columns that keeps most of the information. That helps you:</p>
+    <ul>
+      <li><strong>See</strong> high-dimensional data as a 2D or 3D plot.</li>
+      <li><strong>Train faster</strong>, because models have fewer inputs to process.</li>
+      <li><strong>Fight overfitting</strong>, since fewer inputs means fewer ways to memorize noise.</li>
+      <li><strong>Remove redundancy</strong> between features that move together.</li>
+    </ul>
+    <p>Whether one number can stand in for two depends on how much the features repeat each other. Use the slider to control that.</p>
+  </div>
+  <figure class="fig">
+    <div class="stage">
+      <canvas class="cv" id="cv-why" aria-label="Scatter plot of centered temperatures with the best-fitting direction drawn through it."></canvas>
+      <p class="figcap"><b>Figure 2.</b> The magenta line is the single direction that captures the most spread.</p>
+    </div>
+    <div class="panel">
+      <div class="ctrl">
+        <label for="why-noise">How differently the two towns behave</label>
+        <div class="row"><input type="range" id="why-noise" min="0" max="6" step="0.1" value="1.2"><output id="why-noise-out" for="why-noise">1.2</output></div>
+      </div>
+      <div class="try">
+        <h3>Try this</h3>
+        <ol class="missions">
+          <li data-m="why-1"><span class="box" aria-hidden="true"></span><span class="txt">Slide all the way to 0. What happens to the cloud?</span></li>
+          <li data-m="why-2"><span class="box" aria-hidden="true"></span><span class="txt">Slide past 5. Watch how much one direction still captures.</span></li>
+        </ol>
+      </div>
+      <p class="coach" id="why-coach" aria-live="polite"></p>
+      <div>
+        <div class="split" aria-hidden="true"><span class="a" id="why-a"></span><span class="b c2" id="why-b"></span></div>
+        <div class="split-legend"><span><span class="sw" style="background:var(--pc1)"></span>Best direction <b id="why-av"></b></span><span><span class="sw" style="background:var(--pc2)"></span>The rest <b id="why-bv"></b></span></div>
+      </div>
+    </div>
+  </figure>
+  <div class="prose">
+    <p>That is the whole idea of PCA: find the directions where the data spreads out most, keep the strong ones, and drop the weak ones. The rest of this guide shows the five steps that find those directions with arithmetic instead of a slider.</p>
+  </div>
+</section>
+
+<!-- ================= 2 CENTER ================= -->
+<section class="chapter" id="center" data-title="Step 1. Center" data-n="2">
+  <div class="chapter-head"><span class="num">2</span><h2>Step 1. Center the data</h2></div>
+  <div class="prose">
+    <p>PCA looks for directions of spread <em>around the middle</em> of the data. So first, move the middle to zero. For each feature, compute its mean and subtract it from every value:</p>
+    <div class="math">
+      <span class="v">x̄</span> = <span class="frac"><span>1</span><span><span class="v">n</span></span></span> ( <span class="v">x</span><sub>1</sub> + <span class="v">x</span><sub>2</sub> + … + <span class="v">x<sub>n</sub></span> ) &nbsp;&nbsp; then &nbsp;&nbsp; <span class="v">x<sub>i</sub></span> ← <span class="v">x<sub>i</sub></span> − <span class="v">x̄</span>
+      <span class="note">Here <span class="v">n</span> is the number of rows (40 days) and <span class="v">x̄</span> is read “x-bar”, the mean.</span>
+    </div>
+  </div>
+  <figure class="fig">
+    <div class="stage">
+      <canvas class="cv static" id="cv-center" aria-label="Scatter of raw temperatures with the mean marked; can be shifted so the mean sits at the origin."></canvas>
+      <p class="figcap"><b>Figure 3.</b> The ring marks the mean. The heavy lines are the zero axes.</p>
+    </div>
+    <div class="panel">
+      <div class="btns"><button class="primary" id="center-btn">Center the data</button></div>
+      <div class="try">
+        <h3>Try this</h3>
+        <ol class="missions">
+          <li data-m="center-1"><span class="box" aria-hidden="true"></span><span class="txt">Press <span class="key">Center the data</span> and watch the ring.</span></li>
+          <li data-m="center-2"><span class="box" aria-hidden="true"></span><span class="txt">Undo it, then compare the cloud's shape before and after.</span></li>
+        </ol>
+      </div>
+      <p class="coach" id="center-coach" aria-live="polite"></p>
+      <dl class="readout">
+        <dt>Mean of Town A</dt><dd id="center-ma"></dd>
+        <dt>Mean of Town B</dt><dd id="center-mb"></dd>
+      </dl>
+      <table class="mini-table" aria-label="First three days before and after centering">
+        <thead><tr><th>Day</th><th>A</th><th>B</th><th>A − Ā</th><th>B − B̄</th></tr></thead>
+        <tbody id="center-rows"></tbody>
+      </table>
+    </div>
+  </figure>
+  <div class="prose">
+    <p>Centering slides the cloud without stretching or turning it, so the shape (the thing PCA cares about) stays the same. From here on, every plot shows centered data.</p>
+  </div>
+</section>
+
+<!-- ================= 3 COVARIANCE ================= -->
+<section class="chapter" id="covariance" data-title="Step 2. Covariance" data-n="3">
+  <div class="chapter-head"><span class="num">3</span><h2>Step 2. Measure how the features move together</h2></div>
+  <div class="prose">
+    <p><strong>Variance</strong> measures how spread out one feature is: the average squared distance from the mean.</p>
+    <div class="math">
+      Var(<span class="v">x</span>) = <span class="frac"><span>1</span><span><span class="v">n</span> − 1</span></span> Σ <span class="v">x<sub>i</sub></span><sup>2</sup>
+      <span class="note">The data is already centered, so each <span class="v">x<sub>i</sub></span> is a distance from the mean. Dividing by <span class="v">n</span> − 1 instead of <span class="v">n</span> is a small correction for estimating from a sample.</span>
+    </div>
+    <p><strong>Covariance</strong> asks a two-feature question: when <span class="v">x</span> is above its mean, is <span class="v">y</span> above its mean too? Multiply the two deviations for each point and average:</p>
+    <div class="math">
+      Cov(<span class="v">x</span>, <span class="v">y</span>) = <span class="frac"><span>1</span><span><span class="v">n</span> − 1</span></span> Σ <span class="v">x<sub>i</sub></span> · <span class="v">y<sub>i</sub></span>
+    </div>
+    <p>Here is a way to see that product. For each point, draw a rectangle from the origin to the point. Its area is <span class="v">x<sub>i</sub></span> · <span class="v">y<sub>i</sub></span>. Points in the top-right or bottom-left give positive areas (<span class="cp">blue</span>). Points in the other two corners give negative areas (<span class="cn">orange</span>). Covariance is the net area, averaged.</p>
+  </div>
+  <figure class="fig">
+    <div class="stage">
+      <canvas class="cv" id="cv-cov" aria-label="Centered scatter with a rectangle from the origin to each point; blue for positive products and orange for negative. Points can be dragged."></canvas>
+      <p class="figcap"><b>Figure 4.</b> Drag any dot to move it. Hover a dot to see its product.</p>
+    </div>
+    <div class="panel">
+      <div class="ctrl">
+        <label for="cov-tilt">Tilt the whole cloud</label>
+        <div class="row"><input type="range" id="cov-tilt" min="-90" max="90" step="1" value="0"><output id="cov-tilt-out" for="cov-tilt">0°</output></div>
+      </div>
+      <div class="try">
+        <h3>Try this</h3>
+        <ol class="missions">
+          <li data-m="cov-1"><span class="box" aria-hidden="true"></span><span class="txt">Tilt until blue and orange balance out, so covariance is near zero.</span></li>
+          <li data-m="cov-2"><span class="box" aria-hidden="true"></span><span class="txt">Keep tilting until covariance is strongly negative.</span></li>
+          <li data-m="cov-3"><span class="box" aria-hidden="true"></span><span class="txt">Drag one dot far into the top-left corner and watch a single point drag covariance down.</span></li>
+        </ol>
+      </div>
+      <p class="coach" id="cov-coach" aria-live="polite"></p>
+      <div class="matwrap">
+        <span class="mattitle">Covariance matrix</span>
+        <div class="matrix" id="cov-mat"></div>
+      </div>
+      <div>
+        <span class="lbl">Total area</span>
+        <div class="split" aria-hidden="true" style="margin-top:6px"><span id="cov-posbar" style="background:var(--pos)"></span><span id="cov-negbar" style="background:var(--neg)"></span></div>
+        <div class="split-legend"><span><span class="sw" style="background:var(--pos)"></span>Positive <b id="cov-posv"></b></span><span><span class="sw" style="background:var(--neg)"></span>Negative <b id="cov-negv"></b></span></div>
+      </div>
+      <div class="btns"><button id="cov-reset">Reset points</button></div>
+    </div>
+  </figure>
+  <div class="prose">
+    <p>Put every variance and covariance into a grid and you get the <strong>covariance matrix</strong>, usually written <span class="v">C</span> or Σ. With <span class="v">d</span> features it is a <span class="v">d</span> × <span class="v">d</span> table:</p>
+    <ul>
+      <li>The <strong>diagonal</strong> holds each feature's variance (its covariance with itself).</li>
+      <li>The <strong>off-diagonal</strong> cells hold covariances between pairs of features.</li>
+      <li>It is <strong>symmetric</strong>: Cov(<span class="v">x</span>, <span class="v">y</span>) = Cov(<span class="v">y</span>, <span class="v">x</span>), so the top-right mirrors the bottom-left.</li>
+    </ul>
+    <p>With the data stacked as a matrix <span class="v">X</span> (one row per day, one column per feature), the whole grid comes from one line: <span class="v">C</span> = <span class="v">X</span><sup>T</sup><span class="v">X</span> / (<span class="v">n</span> − 1).</p>
+    <p>Did you notice what happened while you tilted? The two variances traded places, but their sum stayed fixed. Turning the cloud moves spread between axes; it never creates or destroys it. PCA uses that fact: it turns the axes so as much spread as possible lands on the first one.</p>
+  </div>
+</section>
+
+<!-- ================= 4 COV VS CORR ================= -->
+<section class="chapter" id="cov-vs-corr" data-title="Covariance or correlation?" data-n="4">
+  <div class="chapter-head"><span class="num">4</span><h2>Covariance or correlation?</h2></div>
+  <div class="prose">
+    <p>Covariance has a catch: its size depends on your units. Measure a length in millimeters instead of centimeters and every covariance involving it grows tenfold, and its variance grows a hundredfold. Nothing about the data changed.</p>
+    <p><strong>Correlation</strong> fixes this by dividing out each feature's own spread (its standard deviation, σ, the square root of its variance):</p>
+    <div class="math">
+      <span class="v">r</span>(<span class="v">x</span>, <span class="v">y</span>) = <span class="frac"><span>Cov(<span class="v">x</span>, <span class="v">y</span>)</span><span>σ<sub><span class="v">x</span></sub> · σ<sub><span class="v">y</span></sub></span></span>
+      <span class="note">The result has no units and always lies between −1 and 1. It is the same as the covariance you get after <em>standardizing</em> each feature: subtracting the mean and dividing by σ, which gives z-scores.</span>
+    </div>
+    <p>To see why this matters for PCA, switch to a dataset with mismatched units: 60 penguins, with flipper length and body mass. They are strongly related (bigger penguins have longer flippers), so the honest answer is that PC1 should be a blend of both.</p>
+  </div>
+  <figure class="fig">
+    <div class="stage">
+      <canvas class="cv static" id="cv-cc" aria-label="Penguin data drawn with equal scale on both axes, the way PCA sees it, with PC1 and PC2 directions."></canvas>
+      <p class="figcap"><b>Figure 5.</b> The data as PCA sees it: one unit on the x-axis is drawn the same length as one unit on the y-axis.</p>
+    </div>
+    <div class="panel">
+      <div class="ctrl-grid">
+        <div class="ctrl"><span class="lbl" id="lbl-mass">Body mass unit</span><div class="seg" role="group" aria-labelledby="lbl-mass"><button data-mass="g" aria-pressed="true">grams</button><button data-mass="kg" aria-pressed="false">kilograms</button></div></div>
+        <div class="ctrl"><span class="lbl" id="lbl-flip">Flipper length unit</span><div class="seg" role="group" aria-labelledby="lbl-flip"><button data-flip="mm" aria-pressed="true">mm</button><button data-flip="cm" aria-pressed="false">cm</button></div></div>
+        <div class="ctrl"><span class="lbl" id="lbl-mode">Run PCA on the</span><div class="seg" role="group" aria-labelledby="lbl-mode"><button data-mode="cov" aria-pressed="true">covariance matrix</button><button data-mode="corr" aria-pressed="false">correlation matrix</button></div></div>
+      </div>
+      <div class="try">
+        <h3>Try this</h3>
+        <ol class="missions">
+          <li data-m="cc-1"><span class="box" aria-hidden="true"></span><span class="txt">Switch body mass to kilograms. Watch which feature PC1 points along.</span></li>
+          <li data-m="cc-2"><span class="box" aria-hidden="true"></span><span class="txt">Switch PCA to the correlation matrix.</span></li>
+          <li data-m="cc-3"><span class="box" aria-hidden="true"></span><span class="txt">While on correlation, change a unit. What changes in each matrix?</span></li>
+        </ol>
+      </div>
+      <p class="coach" id="cc-coach" aria-live="polite"></p>
+      <div class="mats">
+        <div class="matwrap" id="cc-covwrap"><span class="mattitle">Covariance</span><div class="matrix" id="cc-cov"></div></div>
+        <div class="matwrap" id="cc-corrwrap"><span class="mattitle">Correlation</span><div class="matrix" id="cc-corr"></div></div>
+      </div>
+      <div>
+        <span class="lbl">What PC1 is made of</span>
+        <div class="load" id="cc-load" style="margin-top:8px"></div>
+      </div>
+    </div>
+  </figure>
+  <div class="prose">
+    <p>Here is the correlation computed from the covariance, live from the figure above:</p>
+    <div class="math" id="cc-calc"></div>
+    <p>With covariance, PCA chases whichever feature has the biggest numbers, and “biggest” depends on a unit you picked. With correlation, every feature starts on equal footing with variance 1, so the result reflects the relationship, not the units.</p>
+  </div>
+  <div class="compare-wrap">
+    <table class="compare">
+      <thead><tr><th scope="col"></th><th scope="col">Covariance matrix</th><th scope="col">Correlation matrix</th></tr></thead>
+      <tbody>
+        <tr><th scope="row">Each entry</th><td>Average product of deviations, Cov(<i>x</i>, <i>y</i>)</td><td>Covariance divided by σ<sub><i>x</i></sub>σ<sub><i>y</i></sub></td></tr>
+        <tr><th scope="row">Units</th><td>Units of <i>x</i> × units of <i>y</i> (mm·g, °C²…)</td><td>None</td></tr>
+        <tr><th scope="row">Range</th><td>Any value; the size alone tells you little</td><td>−1 to 1; ±1 is a perfect line, 0 is no linear relation</td></tr>
+        <tr><th scope="row">Diagonal</th><td>Each feature's variance</td><td>Always 1</td></tr>
+        <tr><th scope="row">Change a unit</th><td>Entries change, and PCA's answer can change</td><td>Nothing changes</td></tr>
+        <tr><th scope="row">Same as</th><td>Covariance of centered data</td><td>Covariance of standardized data (z-scores)</td></tr>
+        <tr><th scope="row">Use for PCA when</th><td>Features share a unit and their size differences mean something (pixel brightness, both towns' temperatures)</td><td>Features have different units or very different scales (mass and length, income and age)</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="callout">
+    <p><strong>In practice:</strong> scikit-learn's <code>PCA</code> centers your data but does not scale it, so it runs on the covariance matrix. To get correlation-based PCA, put a <code>StandardScaler</code> in front of it.</p>
+  </div>
+</section>
+
+<!-- ================= 5 EIGEN ================= -->
+<section class="chapter" id="eigen" data-title="Step 3. Eigenvectors" data-n="5">
+  <div class="chapter-head"><span class="num">5</span><h2>Step 3. Find the directions the matrix does not turn</h2></div>
+  <div class="prose">
+    <p>Back to the temperatures. You found PC1 in Figure 1 by turning a line. The math finds it in one shot, using <strong>eigenvectors</strong>.</p>
+    <p>Think of the covariance matrix <span class="v">C</span> as a machine: feed it an arrow <span class="v">v</span>, and it hands back a new arrow <span class="v">Cv</span>. Most arrows come out turned. A few special directions come out pointing the same way, only longer or shorter:</p>
+    <div class="math">
+      <span class="v">C</span> <span class="v">v</span> = λ <span class="v">v</span>
+      <span class="note">The arrow <span class="v">v</span> is an <em>eigenvector</em>. The stretch factor λ (lambda) is its <em>eigenvalue</em>.</span>
+    </div>
+    <p>For a covariance matrix, these special directions are exactly the principal components, and each eigenvalue is the variance of the data along its direction. Find them below.</p>
+  </div>
+  <figure class="fig">
+    <div class="stage">
+      <canvas class="cv" id="cv-eig" aria-label="Unit circle with a rotatable arrow v and the transformed arrow Cv, plus the ellipse the matrix turns the circle into."></canvas>
+      <p class="figcap"><b>Figure 6.</b> Black arrow: <i>v</i>. Blue arrow: <i>Cv</i>, shrunk to fit. Dashed ellipse: where <i>C</i> sends every arrow on the circle.</p>
+    </div>
+    <div class="panel">
+      <div class="ctrl">
+        <label for="eig-angle">Direction of v</label>
+        <div class="row"><input type="range" id="eig-angle" min="0" max="359.5" step="0.5" value="110"><output id="eig-angle-out" for="eig-angle">110°</output></div>
+      </div>
+      <div class="try">
+        <h3>Try this</h3>
+        <ol class="missions">
+          <li data-m="eig-1"><span class="box" aria-hidden="true"></span><span class="txt">Turn <i>v</i> until <i>Cv</i> points the same way and is as long as it gets.</span></li>
+          <li data-m="eig-2"><span class="box" aria-hidden="true"></span><span class="txt">Find the other direction where the two arrows line up.</span></li>
+        </ol>
+      </div>
+      <p class="coach" id="eig-coach" aria-live="polite"></p>
+      <dl class="readout">
+        <dt>Angle between v and Cv</dt><dd id="eig-gap"></dd>
+        <dt>Stretch, |Cv| ÷ |v|</dt><dd id="eig-str"></dd>
+      </dl>
+    </div>
+  </figure>
+  <div class="prose">
+    <p>For a 2 × 2 matrix you can solve this by hand. These numbers come from the temperature data:</p>
+    <ol class="steps" id="eig-steps"></ol>
+    <p>Why does the eigenvector give the longest shadow? The variance of the shadows along a unit direction <span class="v">u</span> works out to <span class="v">u</span><sup>T</sup><span class="v">C</span><span class="v">u</span>. Making that as big as possible, while keeping <span class="v">u</span> at length 1, leads straight to <span class="v">C</span><span class="v">u</span> = λ<span class="v">u</span>. The biggest λ wins. Real libraries use faster methods (often the singular value decomposition), but they compute the same directions.</p>
+  </div>
+</section>
+
+<!-- ================= 6 PROJECT ================= -->
+<section class="chapter" id="project" data-title="Step 4. Rotate and drop" data-n="6">
+  <div class="chapter-head"><span class="num">6</span><h2>Step 4. Rotate onto the new axes, then drop the weak ones</h2></div>
+  <div class="prose">
+    <p>Sort the eigenvectors by eigenvalue, largest first. Each one becomes a new axis. A point's coordinate on a new axis, called its <strong>score</strong>, is its shadow length: the dot product with that eigenvector.</p>
+    <div class="math">
+      score<sub>1</sub> = <span class="v">x<sub>i</sub></span> · <span class="v">v</span><sub>1</sub> = <span class="v">x<sub>i</sub></span><sub>,A</sub> <span class="v">v</span><sub>1,A</sub> + <span class="v">x<sub>i</sub></span><sub>,B</sub> <span class="v">v</span><sub>1,B</sub>
+      <span class="note" id="proj-example"></span>
+    </div>
+  </div>
+  <figure class="fig">
+    <div class="stage">
+      <canvas class="cv static" id="cv-proj" aria-label="Centered temperature data being rotated onto principal component axes, then flattened onto PC1."></canvas>
+      <p class="figcap"><b>Figure 7.</b> Magenta: PC1 axis. Green: PC2 axis.</p>
+    </div>
+    <div class="panel">
+      <div class="btns">
+        <button class="primary" id="proj-rot">Rotate onto PC axes</button>
+        <button id="proj-drop" disabled>Drop PC2</button>
+        <button id="proj-reset" disabled>Start over</button>
+      </div>
+      <div class="try">
+        <h3>Try this</h3>
+        <ol class="missions">
+          <li data-m="proj-1"><span class="box" aria-hidden="true"></span><span class="txt">Rotate the data so PC1 lies flat. Notice nothing is lost yet.</span></li>
+          <li data-m="proj-2"><span class="box" aria-hidden="true"></span><span class="txt">Drop PC2 and see how little the picture changes.</span></li>
+        </ol>
+      </div>
+      <p class="coach" id="proj-coach" aria-live="polite"></p>
+      <div>
+        <div class="split" aria-hidden="true"><span class="a" id="proj-a"></span><span class="b c2" id="proj-b"></span></div>
+        <div class="split-legend"><span><span class="sw" style="background:var(--pc1)"></span>PC1 <b id="proj-av"></b></span><span><span class="sw" style="background:var(--pc2)"></span>PC2 <b id="proj-bv"></b></span></div>
+      </div>
+      <table class="mini-table" aria-label="First five days in original and PC coordinates">
+        <thead><tr><th>Day</th><th>A</th><th>B</th><th>PC1</th><th>PC2</th></tr></thead>
+        <tbody id="proj-rows"></tbody>
+      </table>
+    </div>
+  </figure>
+  <div class="prose">
+    <p>The new axes also mean something. PC1 weights both towns about equally, so a high PC1 score means <em>a warm day in both towns</em>. PC2 weights them with opposite signs, so it measures <em>how much warmer Town A was than Town B</em>. Two correlated columns became one strong column (overall warmth) and one weak one (the difference). Keeping only PC1 halves the data and keeps <span id="proj-keep"></span> of the variance.</p>
+    <p>In matrix form, with the chosen eigenvectors as the columns of <span class="v">W</span>, the whole projection is <span class="v">Z</span> = <span class="v">X</span><span class="v">W</span>. Each row of <span class="v">Z</span> is one day, described with fewer numbers.</p>
+  </div>
+</section>
+
+<!-- ================= 7 HOW MANY ================= -->
+<section class="chapter" id="how-many" data-title="Step 5. How many to keep" data-n="7">
+  <div class="chapter-head"><span class="num">7</span><h2>Step 5. Decide how many components to keep</h2></div>
+  <div class="prose">
+    <p>With two features the choice is easy. With many, you need a rule. Each eigenvalue divided by the sum of all eigenvalues is the share of variance that component explains. Plot those shares in order and you get a <strong>scree plot</strong>.</p>
+    <p>This dataset has 80 cars and six features in different units, so PCA runs on the correlation matrix. Below the chart is that matrix: a 6 × 6 grid, the bigger version of the 2 × 2 grids you used earlier.</p>
+  </div>
+  <figure class="fig">
+    <div class="stage">
+      <svg class="svgfig" id="scree" viewBox="0 0 560 330" role="img" aria-labelledby="scree-title"><title id="scree-title">Scree plot: variance explained by each of six principal components, with a cumulative line</title></svg>
+      <p class="figcap"><b>Figure 8.</b> Bars: share of variance per component. Line: running total. Dashed line: 90%.</p>
+    </div>
+    <div class="panel">
+      <div class="ctrl">
+        <label for="scree-k">Components to keep</label>
+        <div class="row"><input type="range" id="scree-k" min="1" max="6" step="1" value="1"><output id="scree-k-out" for="scree-k">1</output></div>
+      </div>
+      <div class="try">
+        <h3>Try this</h3>
+        <ol class="missions">
+          <li data-m="scree-1"><span class="box" aria-hidden="true"></span><span class="txt">Find the smallest number of components that keeps at least 90% of the variance.</span></li>
+          <li data-m="scree-2"><span class="box" aria-hidden="true"></span><span class="txt">Hover or tab to a bar to read its exact share. Where does the drop-off flatten?</span></li>
+        </ol>
+      </div>
+      <p class="coach" id="scree-coach" aria-live="polite"></p>
+      <div>
+        <span class="lbl">What PC1 and PC2 are made of</span>
+        <table class="mini-table" id="scree-load" style="margin-top:6px"></table>
+      </div>
+    </div>
+  </figure>
+  <div class="heat-wrap" style="max-width:640px">
+    <svg class="svgfig" id="heat" viewBox="0 0 560 330" role="img" aria-labelledby="heat-title"><title id="heat-title">Correlation matrix of the six car features</title></svg>
+  </div>
+  <div class="prose">
+    <p>Common rules for choosing <span class="v">k</span>:</p>
+    <ul>
+      <li><strong>Cumulative threshold:</strong> keep enough components to explain 90 to 95% of the variance.</li>
+      <li><strong>Elbow:</strong> keep the components before the bars flatten out.</li>
+      <li><strong>Downstream score:</strong> try several values of <span class="v">k</span> and keep the one that makes your model perform best on validation data.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ================= 8 RECAP ================= -->
+<section class="chapter" id="recap" data-title="Recap and check" data-n="8">
+  <div class="chapter-head"><span class="num">8</span><h2>The whole recipe, and a quick check</h2></div>
+  <ol class="steps recipe">
+    <li><div><strong>Center</strong> each feature by subtracting its mean. If features use different units, also divide by the standard deviation (standardize).</div></li>
+    <li><div><strong>Build the matrix:</strong> <i>C</i> = <i>X</i><sup>T</sup><i>X</i> / (<i>n</i> − 1). That is the covariance matrix of centered data, or the correlation matrix of standardized data.</div></li>
+    <li><div><strong>Find eigenvectors and eigenvalues</strong> of <i>C</i>. Eigenvectors are the principal directions; eigenvalues are the variance along each.</div></li>
+    <li><div><strong>Sort and choose <i>k</i></strong> using explained variance: each λ divided by the sum of all λ.</div></li>
+    <li><div><strong>Project:</strong> <i>Z</i> = <i>XW</i>, where <i>W</i> holds the top <i>k</i> eigenvectors as columns.</div></li>
+  </ol>
+  <div class="prose">
+    <h3 style="margin:28px 0 10px">Things that trip people up</h3>
+    <ul>
+      <li><strong>Scale:</strong> unscaled features with big numbers dominate. You saw PC1 swing between features just by changing grams to kilograms.</li>
+      <li><strong>Outliers:</strong> covariance squares and multiplies distances, so a single extreme point can tilt the components. You dragged one dot and watched it happen.</li>
+      <li><strong>Straight lines only:</strong> PCA finds flat directions. Data on a curve (a spiral, a ring) needs nonlinear methods such as kernel PCA, t-SNE, or UMAP.</li>
+      <li><strong>Signs are arbitrary:</strong> if <i>v</i> is an eigenvector, so is −<i>v</i>. Two libraries can return flipped components that mean the same thing.</li>
+      <li><strong>Fit on training data only:</strong> compute the means, scales, and components from the training set, then apply them to the test set. Fitting on everything leaks test information.</li>
+      <li><strong>Meaning gets blurry:</strong> each component is a blend of features. Read the loadings, as you did for the cars, before naming one.</li>
+    </ul>
+  </div>
+  <h3 style="margin:36px 0 0">Check yourself</h3>
+  <div class="quiz" id="quiz"></div>
+  <footer>
+    <p>All data in this guide is simulated so the patterns are clear. The temperature, penguin, and car figures are illustrations, not measurements.</p>
+  </footer>
+</section>
+</main>
+</div>
+
+<script>
+"use strict";
+/* ================= utilities ================= */
+const RM = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const DEG = Math.PI / 180;
+function rng(seed){return function(){seed|=0;seed=seed+0x6D2B79F5|0;let t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+function gauss(r){let u=0;while(u===0)u=r();const v=r();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);}
+function fmt(x, d){
+  const a = Math.abs(x);
+  if (d === undefined) d = a >= 100 ? 0 : a >= 10 ? 1 : a >= 1 ? 2 : 3;
+  const s = x.toLocaleString("en-US",{minimumFractionDigits:d,maximumFractionDigits:d});
+  return s.replace(/^-/, "−");
+}
+const pct = (x, d = 0) => fmt(100 * x, d) + "%";
+function mod(a, m){return ((a % m) + m) % m;}
+function angDiff180(a, b){const d = mod(a - b, 180); return Math.min(d, 180 - d);}
+function niceStep(raw){const p = Math.pow(10, Math.floor(Math.log10(raw))); const f = raw / p; return (f < 1.5 ? 1 : f < 3.5 ? 2 : f < 7.5 ? 5 : 10) * p;}
+
+function stats(pts){
+  const n = pts.length; let mx = 0, my = 0;
+  for (const p of pts){mx += p.x; my += p.y;} mx /= n; my /= n;
+  let vx = 0, vy = 0, cxy = 0;
+  for (const p of pts){const dx = p.x - mx, dy = p.y - my; vx += dx*dx; vy += dy*dy; cxy += dx*dy;}
+  return {n, mx, my, vx: vx/(n-1), vy: vy/(n-1), cxy: cxy/(n-1)};
+}
+function eig2(a, b, c){
+  const T = a + c, D = a*c - b*b, disc = Math.sqrt(Math.max(0, T*T/4 - D));
+  const l1 = T/2 + disc, l2 = T/2 - disc;
+  const theta = 0.5 * Math.atan2(2*b, a - c);
+  return {l1, l2, theta, T, D, disc};
+}
+function jacobi(A){
+  const n = A.length, a = A.map(r => r.slice());
+  const V = Array.from({length:n}, (_, i) => Array.from({length:n}, (_, j) => i === j ? 1 : 0));
+  for (let sweep = 0; sweep < 100; sweep++){
+    let off = 0; for (let p = 0; p < n; p++) for (let q = p+1; q < n; q++) off += a[p][q]*a[p][q];
+    if (off < 1e-18) break;
+    for (let p = 0; p < n; p++) for (let q = p+1; q < n; q++){
+      if (Math.abs(a[p][q]) < 1e-15) continue;
+      const th = (a[q][q] - a[p][p]) / (2*a[p][q]);
+      const t = (th >= 0 ? 1 : -1) / (Math.abs(th) + Math.sqrt(th*th + 1));
+      const c = 1/Math.sqrt(t*t + 1), s = t*c;
+      for (let k = 0; k < n; k++){const akp = a[k][p], akq = a[k][q]; a[k][p] = c*akp - s*akq; a[k][q] = s*akp + c*akq;}
+      for (let k = 0; k < n; k++){const apk = a[p][k], aqk = a[q][k]; a[p][k] = c*apk - s*aqk; a[q][k] = s*apk + c*aqk;}
+      for (let k = 0; k < n; k++){const vkp = V[k][p], vkq = V[k][q]; V[k][p] = c*vkp - s*vkq; V[k][q] = s*vkp + c*vkq;}
+    }
+  }
+  const out = a.map((r, i) => ({val: r[i], vec: V.map(row => row[i])}));
+  out.sort((x, y) => y.val - x.val);
+  return out;
+}
+function animate(dur, step, done){
+  if (RM || dur <= 0){step(1); done && done(); return;}
+  const t0 = performance.now();
+  function f(now){
+    const t = Math.min(1, (now - t0)/dur); const e = t < .5 ? 2*t*t : 1 - Math.pow(-2*t + 2, 2)/2;
+    step(e); if (t < 1) requestAnimationFrame(f); else done && done();
+  }
+  requestAnimationFrame(f);
+}
+
+/* ================= theme colors for canvas ================= */
+let COL = null;
+function col(){
+  if (!COL){
+    const s = getComputedStyle(document.documentElement); COL = {};
+    for (const k of ["paper","plate","ink","ink-2","rule","grid","pc1","pc2","pos","neg"]) COL[k] = s.getPropertyValue("--" + k).trim();
+  }
+  return COL;
+}
+function rgba(hex, a){
+  const h = hex.replace("#", ""); const n = parseInt(h.length === 3 ? h.split("").map(c => c+c).join("") : h, 16);
+  return `rgba(${n>>16&255},${n>>8&255},${n&255},${a})`;
+}
+const plots = [];
+function retheme(){COL = null; plots.forEach(p => p.draw());}
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", retheme);
+new MutationObserver(retheme).observe(document.documentElement, {attributes:true, attributeFilter:["data-theme","class","style"]});
+
+/* ================= canvas plot helper ================= */
+const UIFONT = '500 11px Archivo, "Helvetica Neue", Arial, sans-serif';
+class Plot{
+  constructor(canvas, drawFn, opts = {}){
+    this.c = canvas; this.ctx = canvas.getContext("2d"); this.drawFn = drawFn;
+    this.equal = opts.equal !== false; this.pad = opts.pad ?? 26; this.vb = {xmin:-1,xmax:1,ymin:-1,ymax:1};
+    this.pending = false;
+    new ResizeObserver(() => this.resize()).observe(canvas);
+    plots.push(this);
+  }
+  resize(){
+    const r = this.c.getBoundingClientRect(); if (!r.width) return;
+    const d = window.devicePixelRatio || 1; this.w = r.width; this.h = r.height;
+    this.c.width = Math.round(r.width*d); this.c.height = Math.round(r.height*d);
+    this.ctx.setTransform(d, 0, 0, d, 0, 0); this.draw();
+  }
+  view(xmin, xmax, ymin, ymax){this.vb = {xmin, xmax, ymin, ymax};}
+  fit(){
+    const {xmin, xmax, ymin, ymax} = this.vb, W = this.w - 2*this.pad, H = this.h - 2*this.pad;
+    if (this.equal){const s = Math.min(W/(xmax - xmin), H/(ymax - ymin)); this.sx = this.sy = s;}
+    else {this.sx = W/(xmax - xmin); this.sy = H/(ymax - ymin);}
+    this.ox = this.w/2 - this.sx*(xmin + xmax)/2; this.oy = this.h/2 + this.sy*(ymin + ymax)/2;
+  }
+  X(x){return this.ox + this.sx*x;} Y(y){return this.oy - this.sy*y;}
+  ix(px){return (px - this.ox)/this.sx;} iy(py){return (this.oy - py)/this.sy;}
+  bounds(){return {x0:this.ix(0), x1:this.ix(this.w), y0:this.iy(this.h), y1:this.iy(0)};}
+  req(){if (this.pending) return; this.pending = true; requestAnimationFrame(() => {this.pending = false; this.draw();});}
+  draw(){if (!this.w) return; this.fit(); const ctx = this.ctx; ctx.clearRect(0, 0, this.w, this.h); this.drawFn(this, ctx);}
+  grid(step, o = {}){
+    const ctx = this.ctx, b = this.bounds(), c = col();
+    ctx.lineWidth = 1; ctx.strokeStyle = c.grid; ctx.beginPath();
+    for (let i = Math.ceil(b.x0/step); i*step <= b.x1; i++){const X = Math.round(this.X(i*step)) + .5; ctx.moveTo(X, 0); ctx.lineTo(X, this.h);}
+    for (let i = Math.ceil(b.y0/step); i*step <= b.y1; i++){const Y = Math.round(this.Y(i*step)) + .5; ctx.moveTo(0, Y); ctx.lineTo(this.w, Y);}
+    ctx.stroke();
+    if (o.axes){
+      ctx.strokeStyle = c.rule; ctx.lineWidth = 1.5; ctx.beginPath();
+      const X0 = Math.round(this.X(0)) + .5, Y0 = Math.round(this.Y(0)) + .5;
+      ctx.moveTo(X0, 0); ctx.lineTo(X0, this.h); ctx.moveTo(0, Y0); ctx.lineTo(this.w, Y0); ctx.stroke();
+    }
+    if (o.labels){
+      const ls = o.labelStep || step, f = o.fmt || (v => fmt(v, 0));
+      ctx.fillStyle = c["ink-2"]; ctx.font = UIFONT; ctx.textBaseline = "bottom"; ctx.textAlign = "center";
+      for (let i = Math.ceil(b.x0/ls); i*ls <= b.x1; i++){const x = i*ls, X = this.X(x); if (X < 22 || X > this.w - 22) continue; ctx.fillText(f(x), X, this.h - 4);}
+      ctx.textAlign = "left"; ctx.textBaseline = "middle";
+      for (let i = Math.ceil(b.y0/ls); i*ls <= b.y1; i++){const y = i*ls, Y = this.Y(y); if (Y < 14 || Y > this.h - 22) continue; ctx.fillText(f(y), 4, Y);}
+    }
+  }
+  axisTitles(xt, yt){
+    const ctx = this.ctx, c = col(); ctx.font = '600 11.5px Archivo, "Helvetica Neue", Arial, sans-serif'; ctx.fillStyle = c.ink;
+    ctx.textAlign = "right"; ctx.textBaseline = "bottom"; ctx.fillText(xt, this.w - 6, this.h - 18);
+    ctx.textAlign = "left"; ctx.textBaseline = "top"; ctx.fillText(yt, 26, 6);
+  }
+  infLine(x, y, ang, color, w = 2, dash){
+    const ctx = this.ctx, L = 1e4, dx = Math.cos(ang), dy = Math.sin(ang);
+    ctx.save(); ctx.strokeStyle = color; ctx.lineWidth = w; if (dash) ctx.setLineDash(dash);
+    ctx.beginPath(); ctx.moveTo(this.X(x - dx*L/this.sx), this.Y(y - dy*L/this.sx)); ctx.lineTo(this.X(x + dx*L/this.sx), this.Y(y + dy*L/this.sx)); ctx.stroke(); ctx.restore();
+  }
+  seg(x1, y1, x2, y2, color, w = 1, dash){
+    const ctx = this.ctx; ctx.save(); ctx.strokeStyle = color; ctx.lineWidth = w; if (dash) ctx.setLineDash(dash);
+    ctx.beginPath(); ctx.moveTo(this.X(x1), this.Y(y1)); ctx.lineTo(this.X(x2), this.Y(y2)); ctx.stroke(); ctx.restore();
+  }
+  dot(x, y, r, fill, ring){
+    const ctx = this.ctx; ctx.beginPath(); ctx.arc(this.X(x), this.Y(y), r, 0, 2*Math.PI);
+    if (ring){ctx.lineWidth = 2; ctx.strokeStyle = ring; ctx.stroke();}
+    ctx.fillStyle = fill; ctx.fill();
+  }
+  arrow(x0, y0, x1, y1, color, w = 2.5){
+    const ctx = this.ctx, X0 = this.X(x0), Y0 = this.Y(y0), X1 = this.X(x1), Y1 = this.Y(y1);
+    const a = Math.atan2(Y1 - Y0, X1 - X0), len = Math.hypot(X1 - X0, Y1 - Y0), hs = Math.min(12, len*.45);
+    ctx.save(); ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = w; ctx.lineCap = "round";
+    ctx.beginPath(); ctx.moveTo(X0, Y0); ctx.lineTo(X1 - Math.cos(a)*hs*.6, Y1 - Math.sin(a)*hs*.6); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(X1, Y1); ctx.lineTo(X1 - hs*Math.cos(a - .42), Y1 - hs*Math.sin(a - .42)); ctx.lineTo(X1 - hs*Math.cos(a + .42), Y1 - hs*Math.sin(a + .42)); ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
+  label(text, x, y, color, align = "left", base = "middle", weight = 600){
+    const ctx = this.ctx; ctx.font = `${weight} 12px Archivo, "Helvetica Neue", Arial, sans-serif`;
+    ctx.fillStyle = color; ctx.textAlign = align; ctx.textBaseline = base; ctx.fillText(text, this.X(x), this.Y(y));
+  }
+}
+function pointer(canvas, plot, h){
+  let active = false;
+  const pt = e => {const r = canvas.getBoundingClientRect(); const px = e.clientX - r.left, py = e.clientY - r.top; return {px, py, x: plot.ix(px), y: plot.iy(py)};};
+  canvas.addEventListener("pointerdown", e => {const p = pt(e); if (h.down && h.down(p) === false) return; active = true; canvas.setPointerCapture(e.pointerId); h.move && h.move(p); e.preventDefault();});
+  canvas.addEventListener("pointermove", e => {const p = pt(e); if (active) h.move && h.move(p); else h.hover && h.hover(p);});
+  const end = e => {if (!active) return; active = false; h.up && h.up(pt(e));};
+  canvas.addEventListener("pointerup", end); canvas.addEventListener("pointercancel", end);
+  canvas.addEventListener("pointerleave", () => {if (!active && h.hover) h.hover(null);});
+}
+
+/* ================= missions + rail ================= */
+const MISSIONS = {};
+$$("[data-m]").forEach(li => {
+  const sr = document.createElement("span"); sr.className = "sr"; sr.textContent = " (not done yet)"; li.appendChild(sr);
+  MISSIONS[li.dataset.m] = {el: li, sr, done: false, ch: li.closest("section").id};
+});
+const chapters = $$("section.chapter");
+function buildRail(){
+  const ol = $("#rail-list");
+  chapters.forEach(s => {
+    const li = document.createElement("li"), a = document.createElement("a");
+    a.href = "#" + s.id; a.dataset.ch = s.id;
+    const n = s.dataset.n === "0" ? "◦" : s.dataset.n;
+    a.innerHTML = `<span class="n">${n}</span><span>${s.dataset.title}</span>`;
+    const ms = Object.values(MISSIONS).filter(m => m.ch === s.id);
+    if (ms.length){const p = document.createElement("span"); p.className = "pips"; p.dataset.pips = s.id; ms.forEach(() => {const d = document.createElement("span"); d.className = "pip"; p.appendChild(d);}); a.appendChild(p);}
+    li.appendChild(a); ol.appendChild(li);
+  });
+  updateRail();
+  const io = new IntersectionObserver(es => {
+    es.forEach(e => {if (e.isIntersecting){$$(".rail a").forEach(a => a.classList.toggle("here", a.dataset.ch === e.target.id));}});
+  }, {rootMargin: "-40% 0px -55% 0px"});
+  chapters.forEach(s => io.observe(s));
+}
+function updateRail(){
+  $$("[data-pips]").forEach(p => {
+    const ms = Object.values(MISSIONS).filter(m => m.ch === p.dataset.pips);
+    const n = ms.filter(m => m.done).length;
+    [...p.children].forEach((d, i) => d.classList.toggle("on", i < n));
+    p.setAttribute("aria-label", `${n} of ${ms.length} tasks done`);
+  });
+  const all = Object.values(MISSIONS), n = all.filter(m => m.done).length;
+  $("#rail-total").textContent = `${n} of ${all.length} tasks done`;
+}
+function done(id){
+  const m = MISSIONS[id]; if (!m || m.done) return;
+  m.done = true; m.el.classList.add("done"); m.sr.textContent = " (done)"; updateRail();
+}
+
+/* ================= datasets ================= */
+// Temperatures: 40 days, two neighboring towns (°C)
+const TEMP = (() => {
+  const r = rng(7), out = [], z = [];
+  for (let i = 0; i < 40; i++){
+    const z1 = gauss(r), z2 = gauss(r), z3 = gauss(r); z.push([z1, z2, z3]);
+    out.push({x: 19 + 5.4*z1 + 1.1*z2, y: 17 + 5.0*z1 - 1.2*z2});
+  }
+  return {raw: out, z};
+})();
+const TS = stats(TEMP.raw);
+const TC = TEMP.raw.map(p => ({x: p.x - TS.mx, y: p.y - TS.my}));
+const TE = eig2(TS.vx, TS.cxy, TS.vy);
+const PC1DEG = mod(TE.theta/DEG, 180), PC2DEG = mod(PC1DEG + 90, 180);
+const V1 = {x: Math.cos(TE.theta), y: Math.sin(TE.theta)};
+const V2 = {x: -Math.sin(TE.theta), y: Math.cos(TE.theta)};
+const TOTAL = TS.vx + TS.vy;
+
+/* ================= FIG 1: hero shadow game ================= */
+(() => {
+  const st = {theta: 5};
+  const slider = $("#hero-angle"), out = $("#hero-angle-out");
+  const plot = new Plot($("#cv-hero"), draw);
+  plot.view(TS.mx - 15, TS.mx + 15, TS.my - 15, TS.my + 15);
+  function snap(t){
+    if (angDiff180(t, PC1DEG) < 1.2) return PC1DEG;
+    if (angDiff180(t, PC2DEG) < 1.2) return PC2DEG;
+    return t;
+  }
+  function measure(){
+    const a = st.theta*DEG, u = {x: Math.cos(a), y: Math.sin(a)};
+    let s1 = 0, s2 = 0;
+    for (const p of TC){const t = p.x*u.x + p.y*u.y, r = -p.x*u.y + p.y*u.x; s1 += t*t; s2 += r*r;}
+    return {u, along: s1/(TC.length - 1), off: s2/(TC.length - 1)};
+  }
+  function lineColor(){
+    const c = col();
+    if (angDiff180(st.theta, PC1DEG) < 0.01) return c.pc1;
+    if (angDiff180(st.theta, PC2DEG) < 0.01) return c.pc2;
+    return c.ink;
+  }
+  function draw(p, ctx){
+    const c = col();
+    p.grid(1, {}); p.grid(5, {labels: true, labelStep: 5});
+    p.axisTitles("Town A, °C", "Town B, °C");
+    const {u} = measure(), lc = lineColor();
+    let tmin = 1e9, tmax = -1e9;
+    for (const q of TC){const t = q.x*u.x + q.y*u.y; tmin = Math.min(tmin, t); tmax = Math.max(tmax, t);}
+    p.infLine(TS.mx, TS.my, st.theta*DEG, rgba(c["ink-2"], .5), 1);
+    // shadow extent band
+    ctx.save(); ctx.lineCap = "round";
+    p.seg(TS.mx + u.x*tmin, TS.my + u.y*tmin, TS.mx + u.x*tmax, TS.my + u.y*tmax, rgba(lc, .22), 12);
+    ctx.restore();
+    p.seg(TS.mx + u.x*tmin, TS.my + u.y*tmin, TS.mx + u.x*tmax, TS.my + u.y*tmax, lc, 2.5);
+    for (const q of TC){
+      const t = q.x*u.x + q.y*u.y, fx = TS.mx + u.x*t, fy = TS.my + u.y*t;
+      p.seg(q.x + TS.mx, q.y + TS.my, fx, fy, rgba(c["ink-2"], .45), 1, [3, 3]);
+    }
+    for (const q of TC){const t = q.x*u.x + q.y*u.y; p.dot(TS.mx + u.x*t, TS.my + u.y*t, 3.2, lc);}
+    for (const q of TC) p.dot(q.x + TS.mx, q.y + TS.my, 4.2, rgba(c.ink, .85), c.plate);
+    // mean marker
+    p.dot(TS.mx, TS.my, 5, c.plate, c.ink);
+  }
+  function update(){
+    out.textContent = fmt(st.theta, 1).replace(/\.0$/, "") + "°";
+    const m = measure(), share = m.along/TOTAL, best = TE.l1/TOTAL, worst = TE.l2/TOTAL;
+    $("#hero-kept").style.width = (share*100) + "%"; $("#hero-lost").style.width = ((1 - share)*100) + "%";
+    $("#hero-kept").style.background = lineColor();
+    $("#hero-kv").textContent = pct(share); $("#hero-lv").textContent = pct(1 - share);
+    const coach = $("#hero-coach");
+    if (angDiff180(st.theta, PC1DEG) < 0.01){
+      done("hero-1");
+      coach.innerHTML = `<strong>Found it.</strong> At ${fmt(PC1DEG, 1)}° the shadows keep ${pct(best)} of the total spread. No other angle keeps more. This direction is the <strong class="c1">first principal component</strong>, PC1.`;
+    } else if (angDiff180(st.theta, PC2DEG) < 0.01){
+      done("hero-2");
+      coach.innerHTML = `<strong>Shortest shadow.</strong> Only ${pct(worst)} of the spread survives here, and the angle is exactly 90° from PC1. This is the <strong class="c2">second principal component</strong>, PC2.`;
+    } else if (!MISSIONS["hero-1"].done){
+      coach.innerHTML = `The shadows keep <strong>${pct(share)}</strong> of the spread. The best angle keeps ${pct(best)}. Keep turning.`;
+    } else if (!MISSIONS["hero-2"].done){
+      coach.innerHTML = `Shadows keep <strong>${pct(share)}</strong>. Now hunt for the angle where they keep as little as possible.`;
+    } else {
+      coach.innerHTML = `Spread along the line plus spread lost off it always adds to the same total. Maximizing one is the same as minimizing the other.`;
+    }
+    plot.req();
+  }
+  slider.addEventListener("input", () => {st.theta = snap(+slider.value); update();});
+  pointer($("#cv-hero"), plot, {move: q => {
+    const a = mod(Math.atan2(q.y - TS.my, q.x - TS.mx)/DEG, 180);
+    st.theta = snap(a); slider.value = Math.round(st.theta*2)/2; update();
+  }});
+  update();
+})();
+
+/* ================= FIG 2: why ================= */
+(() => {
+  const slider = $("#why-noise"), out = $("#why-noise-out");
+  let pts = [], E = null, s = 1.2;
+  const plot = new Plot($("#cv-why"), draw); plot.view(-15, 15, -15, 15);
+  function gen(){
+    pts = TEMP.z.map(([z1, z2, z3]) => ({x: 5.4*z1 + s*z2, y: 5.0*z1 - s*z3}));
+    const S = stats(pts); pts = pts.map(p => ({x: p.x - S.mx, y: p.y - S.my}));
+    const S2 = stats(pts); E = eig2(S2.vx, S2.cxy, S2.vy);
+  }
+  function draw(p){
+    const c = col(); p.grid(1); p.grid(5, {axes: true, labels: true, labelStep: 5});
+    p.axisTitles("Town A, centered", "Town B, centered");
+    p.infLine(0, 0, E.theta + Math.PI/2, rgba(c.pc2, .7), 1.5, [5, 4]);
+    p.infLine(0, 0, E.theta, c.pc1, 2.5);
+    for (const q of pts) p.dot(q.x, q.y, 4.2, rgba(c.ink, .85), c.plate);
+  }
+  function update(){
+    s = +slider.value; out.textContent = fmt(s, 1); gen();
+    const share = E.l1/(E.l1 + E.l2);
+    $("#why-a").style.width = (share*100) + "%"; $("#why-b").style.width = ((1 - share)*100) + "%";
+    $("#why-av").textContent = pct(share, 1); $("#why-bv").textContent = pct(1 - share, 1);
+    const coach = $("#why-coach");
+    if (s === 0){done("why-1"); coach.innerHTML = `<strong>Every point sits on one line.</strong> Two numbers per day carry exactly one number's worth of information. One direction captures 100%.`;}
+    else if (s >= 5){done("why-2"); coach.innerHTML = `Now one direction captures only <strong>${pct(share)}</strong>. The second direction carries real information, so dropping it would cost you.`;}
+    else if (share > .9) coach.innerHTML = `One direction captures <strong>${pct(share)}</strong>. The second direction is mostly small wiggles, so dropping it loses little.`;
+    else coach.innerHTML = `One direction captures <strong>${pct(share)}</strong>. The cloud is getting rounder, so a single number per day starts to lose detail.`;
+    plot.req();
+  }
+  slider.addEventListener("input", update); update();
+})();
+
+/* ================= FIG 3: centering ================= */
+(() => {
+  let t = 0, centered = false, everCentered = false;
+  const plot = new Plot($("#cv-center"), draw); plot.view(-17, 36, -17, 36);
+  const btn = $("#center-btn");
+  function draw(p){
+    const c = col(); p.grid(5, {axes: true, labels: true, labelStep: 10});
+    p.axisTitles(t > .5 ? "Town A − mean" : "Town A, °C", t > .5 ? "Town B − mean" : "Town B, °C");
+    const mx = TS.mx*(1 - t), my = TS.my*(1 - t);
+    if (t < 1) p.seg(mx, my, 0, 0, rgba(c["ink-2"], .6*(1 - t)), 1.5, [4, 4]);
+    for (const q of TEMP.raw) p.dot(q.x - TS.mx*t, q.y - TS.my*t, 4.2, rgba(c.ink, .85), c.plate);
+    p.dot(mx, my, 9, "rgba(0,0,0,0)", c.pc1);
+    p.label("mean", mx + 1.2, my + 1.4, c.pc1);
+  }
+  function rows(){
+    $("#center-rows").innerHTML = TEMP.raw.slice(0, 3).map((q, i) =>
+      `<tr><td>${i+1}</td><td>${fmt(q.x, 1)}</td><td>${fmt(q.y, 1)}</td><td>${fmt(q.x - TS.mx, 1)}</td><td>${fmt(q.y - TS.my, 1)}</td></tr>`).join("");
+  }
+  function readouts(){
+    $("#center-ma").textContent = fmt(TS.mx*(1 - t), 1) + " °C"; $("#center-mb").textContent = fmt(TS.my*(1 - t), 1) + " °C";
+  }
+  function coach(){
+    const el = $("#center-coach");
+    if (!everCentered) el.innerHTML = `The cloud sits far from the origin. Its middle, the mean, is at (${fmt(TS.mx, 1)}, ${fmt(TS.my, 1)}).`;
+    else if (centered) el.innerHTML = `The mean is now at (0, 0). Every value is a distance from the average day: positive means warmer than usual.`;
+    else el.innerHTML = `Same shape, same spread, same tilt. Centering only moved the cloud. That is why it is safe to do first.`;
+  }
+  btn.addEventListener("click", () => {
+    const from = t, to = centered ? 0 : 1; centered = !centered; btn.disabled = true;
+    animate(800, e => {t = from + (to - from)*e; readouts(); plot.req();}, () => {
+      btn.disabled = false; btn.textContent = centered ? "Undo centering" : "Center the data";
+      if (centered){everCentered = true; done("center-1");} else if (everCentered) done("center-2");
+      coach();
+    });
+  });
+  rows(); readouts(); coach();
+})();
+
+/* ================= FIG 4: covariance rectangles ================= */
+(() => {
+  const plot = new Plot($("#cv-cov"), draw); plot.view(-14, 14, -14, 14);
+  let base = TC.map(p => ({...p})), phi = 0, hover = -1, drag = -1;
+  const slider = $("#cov-tilt"), out = $("#cov-tilt-out");
+  const rot = (p, a) => ({x: p.x*Math.cos(a) - p.y*Math.sin(a), y: p.x*Math.sin(a) + p.y*Math.cos(a)});
+  const shown = () => base.map(p => rot(p, phi*DEG));
+  function draw(p, ctx){
+    const c = col(), pts = shown();
+    p.grid(1); p.grid(5, {axes: true, labels: true, labelStep: 5});
+    p.axisTitles("x: Town A, centered", "y: Town B, centered");
+    // quadrant hints
+    p.label("x·y > 0", 13.5, 13.4, rgba(c.pos, .9), "right", "top", 600);
+    p.label("x·y > 0", -13.5, -13.2, rgba(c.pos, .9), "left", "bottom", 600);
+    p.label("x·y < 0", -13.5, 13.4, rgba(c.neg, .95), "left", "top", 600);
+    p.label("x·y < 0", 13.5, -13.2, rgba(c.neg, .95), "right", "bottom", 600);
+    pts.forEach((q, i) => {
+      const pos = q.x*q.y >= 0, cc = pos ? c.pos : c.neg, hi = i === hover || i === drag;
+      const X0 = p.X(0), Y0 = p.Y(0), X1 = p.X(q.x), Y1 = p.Y(q.y);
+      ctx.fillStyle = rgba(cc, hi ? .32 : .09); ctx.fillRect(Math.min(X0, X1), Math.min(Y0, Y1), Math.abs(X1 - X0), Math.abs(Y1 - Y0));
+      ctx.strokeStyle = rgba(cc, hi ? .9 : .32); ctx.lineWidth = hi ? 1.5 : 1; ctx.strokeRect(Math.min(X0, X1) + .5, Math.min(Y0, Y1) + .5, Math.abs(X1 - X0), Math.abs(Y1 - Y0));
+    });
+    pts.forEach((q, i) => p.dot(q.x, q.y, i === hover || i === drag ? 6 : 4.2, c.ink, c.plate));
+    const k = drag >= 0 ? drag : hover;
+    if (k >= 0){
+      const q = pts[k], txt = `x = ${fmt(q.x, 1)}, y = ${fmt(q.y, 1)}, x·y = ${fmt(q.x*q.y, 1)}`;
+      ctx.font = '600 12px Archivo, "Helvetica Neue", Arial, sans-serif';
+      const w = ctx.measureText(txt).width + 16; let X = p.X(q.x) + 12, Y = p.Y(q.y) - 34;
+      if (X + w > p.w - 4) X = p.X(q.x) - w - 12; if (Y < 4) Y = p.Y(q.y) + 12;
+      ctx.fillStyle = c.ink; ctx.beginPath(); ctx.roundRect ? ctx.roundRect(X, Y, w, 24, 5) : ctx.rect(X, Y, w, 24); ctx.fill();
+      ctx.fillStyle = c.plate; ctx.textAlign = "left"; ctx.textBaseline = "middle"; ctx.fillText(txt, X + 8, Y + 12);
+    }
+  }
+  function nearest(q){
+    const pts = shown(); let best = -1, bd = 16;
+    pts.forEach((r, i) => {const d = Math.hypot(plot.X(r.x) - q.px, plot.Y(r.y) - q.py); if (d < bd){bd = d; best = i;}});
+    return best;
+  }
+  function matrixHTML(S){
+    const off = S.cxy < 0 ? "o neg" : "o";
+    return `<span></span><span class="ch">A</span><span class="ch">B</span>
+      <span class="rh">A</span><span class="rh" style="grid-row:3">B</span>
+      <div class="mbody"><span class="cell d">${fmt(S.vx, 1)}<small>Var(A)</small></span><span class="cell ${off}">${fmt(S.cxy, 1)}<small>Cov(A, B)</small></span>
+      <span class="cell ${off}">${fmt(S.cxy, 1)}<small>Cov(B, A)</small></span><span class="cell d">${fmt(S.vy, 1)}<small>Var(B)</small></span></div>`;
+  }
+  let lastDragged = null;
+  function update(){
+    out.textContent = phi + "°";
+    const pts = shown(), S = stats(pts);
+    let P = 0, N = 0; for (const q of pts){const a = q.x*q.y; if (a >= 0) P += a; else N -= a;}
+    $("#cov-mat").innerHTML = matrixHTML(S);
+    const tot = P + N || 1;
+    $("#cov-posbar").style.width = (100*P/tot) + "%"; $("#cov-negbar").style.width = (100*N/tot) + "%";
+    $("#cov-posv").textContent = fmt(P, 0); $("#cov-negv").textContent = "−" + fmt(N, 0);
+    const r = S.cxy/Math.sqrt(S.vx*S.vy);
+    const coach = $("#cov-coach");
+    const sumLine = ` Var(A) + Var(B) = ${fmt(S.vx + S.vy, 1)}.`;
+    let msg;
+    if (Math.abs(r) < .04){done("cov-1"); msg = `<strong>Balanced.</strong> Blue and orange areas cancel, so covariance is about ${fmt(S.cxy, 1)}. In this tilt, knowing x tells you nothing about the direction of y.` + sumLine;}
+    else if (r < -.6){done("cov-2"); msg = `<strong>Strongly negative.</strong> Most rectangles are orange: when x is above average, y tends to be below.` + sumLine;}
+    else msg = `Covariance = (${fmt(P, 0)} − ${fmt(N, 0)}) ÷ ${S.n - 1} = <strong>${fmt(S.cxy, 1)}</strong>.` + sumLine;
+    if (lastDragged){
+      const q = pts[lastDragged.i];
+      if (q && q.x < -5 && q.y > 5){done("cov-3"); msg = `That one dot adds ${fmt(q.x*q.y, 0)} of orange area. One extreme point moved covariance to ${fmt(S.cxy, 1)}. PCA inherits this sensitivity to outliers.`;}
+    }
+    coach.innerHTML = msg;
+    plot.req();
+  }
+  slider.addEventListener("input", () => {phi = +slider.value; lastDragged = null; update();});
+  pointer($("#cv-cov"), plot, {
+    down: q => {const i = nearest(q); if (i < 0) return false; drag = i;},
+    move: q => {if (drag < 0) return; const x = Math.max(-13.5, Math.min(13.5, q.x)), y = Math.max(-13.5, Math.min(13.5, q.y)); base[drag] = rot({x, y}, -phi*DEG); lastDragged = {i: drag}; update();},
+    up: () => {drag = -1; plot.req();},
+    hover: q => {const i = q ? nearest(q) : -1; if (i !== hover){hover = i; plot.req();}}
+  });
+  $("#cov-reset").addEventListener("click", () => {base = TC.map(p => ({...p})); phi = 0; slider.value = 0; lastDragged = null; update();});
+  update();
+})();
+
+/* ================= FIG 5: covariance vs correlation ================= */
+(() => {
+  const r = rng(11), PEN = [];
+  for (let i = 0; i < 60; i++){const z1 = gauss(r), z2 = gauss(r); PEN.push({f: 200 + 14*z1, m: 4200 + 800*(0.87*z1 + 0.49*z2)});}
+  const st = {mass: "g", flip: "mm", mode: "cov"};
+  let cur = null;
+  const plot = new Plot($("#cv-cc"), draw);
+  function compute(){
+    const fd = st.flip === "cm" ? 10 : 1, md = st.mass === "kg" ? 1000 : 1;
+    const pts = PEN.map(p => ({x: p.f/fd, y: p.m/md}));
+    const S = stats(pts), sx = Math.sqrt(S.vx), sy = Math.sqrt(S.vy), rr = S.cxy/(sx*sy);
+    const E = st.mode === "cov" ? eig2(S.vx, S.cxy, S.vy) : eig2(1, rr, 1);
+    let th = E.theta; if (Math.cos(th) + Math.sin(th) < 0) th += Math.PI;
+    const shown = st.mode === "cov" ? pts.map(p => ({x: p.x - S.mx, y: p.y - S.my})) : pts.map(p => ({x: (p.x - S.mx)/sx, y: (p.y - S.my)/sy}));
+    cur = {S, sx, sy, rr, E, th, shown};
+  }
+  function draw(p){
+    const c = col(), {S, sx, sy, E, th, shown} = cur;
+    let half = st.mode === "cov" ? 3.1*Math.max(sx, sy) : 3.2;
+    p.view(-half, half, -half, half);
+    p.fit();
+    const step = niceStep(half/2.5);
+    p.grid(step, {axes: true, labels: true, labelStep: step, fmt: v => fmt(v, step < 1 ? (step < .1 ? 2 : 1) : 0)});
+    const fu = st.flip, mu = st.mass;
+    if (st.mode === "cov") p.axisTitles(`Flipper length, ${fu} (centered)`, `Body mass, ${mu} (centered)`);
+    else p.axisTitles("Flipper length, z-score", "Body mass, z-score");
+    p.infLine(0, 0, th + Math.PI/2, rgba(c.pc2, .8), 1.5, [5, 4]);
+    p.infLine(0, 0, th, c.pc1, 2.5);
+    for (const q of shown) p.dot(q.x, q.y, 3.8, rgba(c.ink, .8), c.plate);
+    const L = half*.82;
+    p.label("PC1", Math.cos(th)*L + half*.04, Math.sin(th)*L, c.pc1, "left", "middle", 700);
+    p.label("PC2", Math.cos(th + Math.PI/2)*L*.7 + half*.04, Math.sin(th + Math.PI/2)*L*.7, c.pc2, "left", "middle", 700);
+  }
+  function mat(a, b, c, units){
+    const off = b < 0 ? "o neg" : "o";
+    return `<span></span><span class="ch">Flipper</span><span class="ch">Mass</span>
+      <span class="rh">Flipper</span><span class="rh" style="grid-row:3">Mass</span>
+      <div class="mbody"><span class="cell d">${fmt(a)}${units ? `<small>${units[0]}</small>` : ""}</span><span class="cell ${off}">${fmt(b)}${units ? `<small>${units[1]}</small>` : ""}</span>
+      <span class="cell ${off}">${fmt(b)}${units ? `<small>${units[1]}</small>` : ""}</span><span class="cell d">${fmt(c)}${units ? `<small>${units[2]}</small>` : ""}</span></div>`;
+  }
+  function update(){
+    compute();
+    const {S, sx, sy, rr, E, th} = cur, fu = st.flip, mu = st.mass;
+    $("#cc-cov").innerHTML = mat(S.vx, S.cxy, S.vy, [`${fu}²`, `${fu}·${mu}`, `${mu}²`]);
+    $("#cc-corr").innerHTML = mat(1, rr, 1, null);
+    $("#cc-covwrap").classList.toggle("used", st.mode === "cov"); $("#cc-corrwrap").classList.toggle("used", st.mode === "corr");
+    const wf = Math.abs(Math.cos(th)), wm = Math.abs(Math.sin(th)), share = E.l1/(E.l1 + E.l2);
+    $("#cc-load").innerHTML = `<span>Flipper length</span><span class="bar"><span style="width:${wf*100}%"></span></span><span class="val">${fmt(wf, 2)}</span>
+      <span>Body mass</span><span class="bar"><span style="width:${wm*100}%"></span></span><span class="val">${fmt(wm, 2)}</span>
+      <span style="color:var(--ink-2)">Explains</span><span></span><span class="val">${pct(share, 1)}</span>`;
+    let what;
+    if (wm > .97) what = `PC1 is <strong>almost pure body mass</strong>. In ${mu}, mass has variance ${fmt(S.vy)}, far bigger than flipper's ${fmt(S.vx)}, so it swamps everything.`;
+    else if (wf > .97) what = `PC1 flipped to <strong>almost pure flipper length</strong>. In ${mu}, mass's variance shrank to ${fmt(S.vy)}, so now flipper's ${fmt(S.vx)} dominates. Same penguins, different answer.`;
+    else what = `PC1 is <strong>a blend of both features</strong>, weighted ${fmt(wf, 2)} and ${fmt(wm, 2)}.`;
+    const coach = $("#cc-coach");
+    if (st.mode === "corr") what = `On the correlation matrix, PC1 weights the two features equally (${fmt(wf, 2)} and ${fmt(wm, 2)}): bigger penguins have both longer flippers and more mass. ` + (MISSIONS["cc-3"].done ? `Units changed the covariance matrix, but the correlation matrix stayed at r = ${fmt(rr, 2)}.` : `Try changing a unit now.`);
+    coach.innerHTML = what;
+    $("#cc-calc").innerHTML = `<span class="v">r</span> = <span class="frac"><span>Cov(flipper, mass)</span><span>σ<sub>flipper</sub> · σ<sub>mass</sub></span></span> = <span class="frac"><span>${fmt(S.cxy)} ${fu}·${mu}</span><span>${fmt(sx)} ${fu} × ${fmt(sy)} ${mu}</span></span> = <strong>${fmt(rr, 2)}</strong>
+      <span class="note">The units cancel top and bottom. Change a unit in Figure 5 and every number here changes except the result.</span>`;
+    plot.req();
+  }
+  $$("#cov-vs-corr .seg button").forEach(b => b.addEventListener("click", () => {
+    const key = b.dataset.mass ? "mass" : b.dataset.flip ? "flip" : "mode", val = b.dataset[key];
+    if (st[key] === val) return;
+    st[key] = val;
+    $$(`#cov-vs-corr [data-${key}]`).forEach(x => x.setAttribute("aria-pressed", x.dataset[key] === val));
+    if (key === "mass" && val === "kg" && st.mode === "cov") done("cc-1");
+    if (key === "mode" && val === "corr") done("cc-2");
+    if (key !== "mode" && st.mode === "corr" && MISSIONS["cc-2"].done) done("cc-3");
+    update();
+  }));
+  update();
+})();
+
+/* ================= FIG 6: eigenvectors ================= */
+(() => {
+  const a = TS.vx, b = TS.cxy, c0 = TS.vy, E = TE, S = 1/E.l1;
+  const st = {alpha: 110};
+  const slider = $("#eig-angle"), out = $("#eig-angle-out");
+  const plot = new Plot($("#cv-eig"), draw); plot.view(-1.3, 1.3, -1.3, 1.3);
+  const Cv = v => ({x: a*v.x + b*v.y, y: b*v.x + c0*v.y});
+  function which(){
+    if (angDiff180(st.alpha, PC1DEG) < 0.01) return 1;
+    if (angDiff180(st.alpha, PC2DEG) < 0.01) return 2;
+    return 0;
+  }
+  function snap(t){
+    for (const target of [PC1DEG, PC1DEG + 180, PC2DEG, PC2DEG + 180]) if (Math.abs(mod(t - target + 180, 360) - 180) < 1.2) return mod(target, 360);
+    return t;
+  }
+  function draw(p, ctx){
+    const c = col(); p.grid(.25); p.grid(.5, {axes: true, labels: true, labelStep: .5, fmt: v => fmt(v, 1)});
+    ctx.save(); ctx.strokeStyle = c.rule; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(p.X(0), p.Y(0), p.sx, 0, 2*Math.PI); ctx.stroke(); ctx.restore();
+    ctx.save(); ctx.strokeStyle = rgba(c["ink-2"], .9); ctx.setLineDash([5, 4]); ctx.lineWidth = 1.5; ctx.beginPath();
+    for (let i = 0; i <= 120; i++){const t = i/120*2*Math.PI, w = Cv({x: Math.cos(t), y: Math.sin(t)}); const X = p.X(w.x*S), Y = p.Y(w.y*S); i ? ctx.lineTo(X, Y) : ctx.moveTo(X, Y);} ctx.stroke(); ctx.restore();
+    if (MISSIONS["eig-1"].done) p.infLine(0, 0, PC1DEG*DEG, rgba(c.pc1, .35), 1.5);
+    if (MISSIONS["eig-2"].done) p.infLine(0, 0, PC2DEG*DEG, rgba(c.pc2, .4), 1.5);
+    const v = {x: Math.cos(st.alpha*DEG), y: Math.sin(st.alpha*DEG)}, w = Cv(v), k = which();
+    const cvCol = k === 1 ? c.pc1 : k === 2 ? c.pc2 : c.pos;
+    p.arrow(0, 0, w.x*S, w.y*S, cvCol, 3.5);
+    p.arrow(0, 0, v.x, v.y, c.ink, 2.5);
+    p.label("v", v.x*1.08, v.y*1.08, c.ink, "center", "middle", 700);
+    const L = Math.hypot(w.x, w.y)*S;
+    if (L > .12) p.label("Cv", w.x*S*1.1 + (k ? .06 : 0), w.y*S*1.1 - (k ? .08 : 0), cvCol, "center", "middle", 700);
+    p.dot(0, 0, 3, c.ink);
+  }
+  function update(){
+    out.textContent = fmt(st.alpha, 1).replace(/\.0$/, "") + "°";
+    const v = {x: Math.cos(st.alpha*DEG), y: Math.sin(st.alpha*DEG)}, w = Cv(v);
+    const gap = Math.abs(mod(Math.atan2(w.y, w.x)/DEG - st.alpha + 180, 360) - 180), len = Math.hypot(w.x, w.y), k = which();
+    $("#eig-gap").textContent = (k ? "0.0" : fmt(gap, 1)) + "°";
+    $("#eig-str").textContent = fmt(len, 2);
+    const coach = $("#eig-coach");
+    if (k === 1){done("eig-1"); coach.innerHTML = `<strong>Lined up.</strong> <i>C</i> only stretched <i>v</i>, by <strong class="c1">λ₁ = ${fmt(E.l1, 1)}</strong>. That is an eigenvector, at ${fmt(PC1DEG, 1)}°: the same angle as the longest shadow in Figure 1.`;}
+    else if (k === 2){done("eig-2"); coach.innerHTML = `<strong>Lined up again</strong>, but barely stretched: <strong class="c2">λ₂ = ${fmt(E.l2, 2)}</strong>. This eigenvector sits at 90° to the first and matches the shortest shadow.`;}
+    else coach.innerHTML = `<i>C</i> turned your arrow by <strong>${fmt(gap, 1)}°</strong> and stretched it ${fmt(len, 1)}×. Look for the spots where the blue arrow lands exactly on the black one.`;
+    plot.req();
+  }
+  slider.addEventListener("input", () => {st.alpha = snap(+slider.value); update();});
+  pointer($("#cv-eig"), plot, {move: q => {if (Math.hypot(q.x, q.y) < .05) return; st.alpha = snap(mod(Math.atan2(q.y, q.x)/DEG, 360)); slider.value = Math.round(st.alpha*2)/2; update();}});
+  // worked steps
+  const v1raw = {x: b, y: E.l1 - a}, n1 = Math.hypot(v1raw.x, v1raw.y);
+  $("#eig-steps").innerHTML = `
+    <li><div>Write the matrix: <i>C</i> = [ ${fmt(a, 1)}, ${fmt(b, 1)} ; ${fmt(b, 1)}, ${fmt(c0, 1)} ]. Call the entries <i>a</i>, <i>b</i>, <i>b</i>, <i>c</i>.</div></li>
+    <li><div>Eigenvalues solve (<i>a</i> − λ)(<i>c</i> − λ) − <i>b</i>² = 0. Expanded, that is λ² − <i>T</i>λ + <i>D</i> = 0, where <i>T</i> = <i>a</i> + <i>c</i> = ${fmt(E.T, 1)} and <i>D</i> = <i>ac</i> − <i>b</i>² = ${fmt(E.D, 1)}.</div></li>
+    <li><div>The quadratic formula gives λ = <i>T</i>/2 ± √(<i>T</i>²/4 − <i>D</i>) = ${fmt(E.T/2, 2)} ± ${fmt(E.disc, 2)}. So <span class="c1">λ₁ = ${fmt(E.l1, 2)}</span> and <span class="c2">λ₂ = ${fmt(E.l2, 2)}</span>.</div></li>
+    <li><div>For each λ, the eigenvector points along (<i>b</i>, λ − <i>a</i>). For λ₁ that is (${fmt(v1raw.x, 2)}, ${fmt(v1raw.y, 2)}); scaled to length 1 it is <span class="c1">(${fmt(v1raw.x/n1, 3)}, ${fmt(v1raw.y/n1, 3)})</span>, an angle of ${fmt(PC1DEG, 1)}°.</div></li>
+    <li><div>Check: λ₁ + λ₂ = ${fmt(E.l1 + E.l2, 2)}, the same as Var(A) + Var(B). PC1 explains λ₁ ÷ (λ₁ + λ₂) = <strong>${pct(E.l1/(E.l1 + E.l2), 1)}</strong> of the variance.</div></li>`;
+  update();
+})();
+
+/* ================= FIG 7: rotate and drop ================= */
+(() => {
+  const st = {r: 0, d: 0, stage: 0};
+  const plot = new Plot($("#cv-proj"), draw); plot.view(-14, 14, -14, 14);
+  const bRot = $("#proj-rot"), bDrop = $("#proj-drop"), bReset = $("#proj-reset");
+  const scores = TC.map(p => ({s1: p.x*V1.x + p.y*V1.y, s2: p.x*V2.x + p.y*V2.y}));
+  function draw(p){
+    const c = col(); p.grid(1); p.grid(5, {labels: true, labelStep: 5});
+    const ang = TE.theta*(1 - st.r);
+    p.infLine(0, 0, ang + Math.PI/2, rgba(c.pc2, .85), 2, st.d > 0 ? [5, 4] : null);
+    p.infLine(0, 0, ang, c.pc1, 2.5);
+    p.label("PC1", Math.cos(ang)*12.6, Math.sin(ang)*12.6 + .9, c.pc1, "right", "bottom", 700);
+    p.label("PC2", Math.cos(ang + Math.PI/2)*12.6 + .6, Math.sin(ang + Math.PI/2)*12.6, c.pc2, "left", "middle", 700);
+    if (st.r === 0) p.axisTitles("Town A, centered", "Town B, centered");
+    else p.axisTitles("PC1 score", "PC2 score");
+    const a = -TE.theta*st.r;
+    TC.forEach((q, i) => {
+      let x = q.x*Math.cos(a) - q.y*Math.sin(a), y = q.x*Math.sin(a) + q.y*Math.cos(a);
+      if (st.d > 0){
+        p.dot(x, y, 3.2, rgba(c["ink-2"], .22*st.d));
+        p.seg(x, y, x, y*(1 - st.d), rgba(c["ink-2"], .35*st.d), 1, [2, 3]);
+        y *= (1 - st.d);
+      }
+      p.dot(x, y, 4.2, st.d > .99 ? c.pc1 : rgba(c.ink, .85), c.plate);
+    });
+  }
+  function table(){
+    $("#proj-rows").innerHTML = TEMP.raw.slice(0, 5).map((q, i) =>
+      `<tr><td>${i+1}</td><td>${fmt(q.x, 1)}</td><td>${fmt(q.y, 1)}</td><td>${fmt(scores[i].s1, 1)}</td><td class="${st.stage === 2 ? "dim" : ""}">${fmt(scores[i].s2, 1)}</td></tr>`).join("");
+  }
+  function coach(){
+    const el = $("#proj-coach"), sh = TE.l1/TOTAL;
+    if (st.stage === 0) el.innerHTML = `The magenta and green lines are the eigenvectors from Step 3. Rotate the data so they become the new horizontal and vertical axes.`;
+    else if (st.stage === 1) el.innerHTML = `Same points, new axes. Rotation loses nothing: the scores in the table still describe every day exactly. Now drop the weak axis.`;
+    else el.innerHTML = `Each day is now one number, its PC1 score. The faint dots show where points were; they moved only a little, because PC2 held just ${pct(1 - sh)} of the variance.`;
+  }
+  const share = TE.l1/TOTAL;
+  $("#proj-a").style.width = (share*100) + "%"; $("#proj-b").style.width = ((1 - share)*100) + "%";
+  $("#proj-av").textContent = pct(share, 1); $("#proj-bv").textContent = pct(1 - share, 1);
+  $("#proj-keep").textContent = pct(share);
+  const q0 = TC[0];
+  $("#proj-example").innerHTML = `Day 1, centered, is (${fmt(q0.x, 2)}, ${fmt(q0.y, 2)}) and <span class="v">v</span><sub>1</sub> = (${fmt(V1.x, 3)}, ${fmt(V1.y, 3)}). Its PC1 score is ${fmt(q0.x, 2)} × ${fmt(V1.x, 3)} + ${fmt(q0.y, 2)} × ${fmt(V1.y, 3)} = ${fmt(scores[0].s1, 2)}.`;
+  function sync(){bRot.disabled = st.stage !== 0; bDrop.disabled = st.stage !== 1; bReset.disabled = st.stage === 0; table(); coach();}
+  bRot.addEventListener("click", () => {bRot.disabled = true; animate(1100, e => {st.r = e; plot.req();}, () => {st.stage = 1; done("proj-1"); sync();});});
+  bDrop.addEventListener("click", () => {bDrop.disabled = true; animate(900, e => {st.d = e; plot.req();}, () => {st.stage = 2; done("proj-2"); sync();});});
+  bReset.addEventListener("click", () => {st.r = 0; st.d = 0; st.stage = 0; plot.req(); sync();});
+  sync();
+})();
+
+/* ================= FIG 8: scree + heatmap ================= */
+(() => {
+  const NAMES = ["Engine size", "Horsepower", "Weight", "Fuel economy", "0–60 mph time", "Price"];
+  const LOAD = [[.9, .1], [.8, .45], [.85, -.3], [-.85, .2], [-.5, -.75], [.55, .6]];
+  const r = rng(23), n = 80, X = [];
+  for (let i = 0; i < n; i++){const f1 = gauss(r), f2 = gauss(r); X.push(LOAD.map(([a, b]) => a*f1 + b*f2 + .27*gauss(r)));}
+  const d = 6, mu = Array(d).fill(0), sd = Array(d).fill(0);
+  X.forEach(row => row.forEach((v, j) => mu[j] += v/n));
+  X.forEach(row => row.forEach((v, j) => sd[j] += (v - mu[j])**2/(n - 1)));
+  for (let j = 0; j < d; j++) sd[j] = Math.sqrt(sd[j]);
+  const Z = X.map(row => row.map((v, j) => (v - mu[j])/sd[j]));
+  const R = Array.from({length: d}, (_, i) => Array.from({length: d}, (_, j) => Z.reduce((s, row) => s + row[i]*row[j], 0)/(n - 1)));
+  const eig = jacobi(R);
+  eig.forEach(e => {if (e.vec.reduce((s, v) => s + v, 0) < 0) e.vec = e.vec.map(v => -v);});
+  const tot = eig.reduce((s, e) => s + e.val, 0), share = eig.map(e => e.val/tot);
+  const cum = share.map((_, i) => share.slice(0, i + 1).reduce((s, v) => s + v, 0));
+  const kStar = cum.findIndex(v => v >= .9) + 1;
+  const NS = "http://www.w3.org/2000/svg";
+  const el = (tag, attrs, parent, text) => {const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (text !== undefined) e.textContent = text; parent && parent.appendChild(e); return e;};
+  const svg = $("#scree"), slider = $("#scree-k"), out = $("#scree-k-out");
+  const L = 46, Rr = 16, T = 18, B = 40, W = 560, H = 330, pw = W - L - Rr, ph = H - T - B;
+  const y = v => T + ph*(1 - v), bw = pw/d;
+  let hovered = -1;
+  function render(){
+    const k = +slider.value;
+    [...svg.querySelectorAll(":scope > :not(title)")].forEach(n => n.remove());
+    for (let v = 0; v <= 1.0001; v += .25){el("line", {x1: L, x2: W - Rr, y1: y(v), y2: y(v), class: v === 0 ? "base" : "gridl"}, svg); el("text", {x: L - 8, y: y(v) + 4, "text-anchor": "end"}, svg, Math.round(v*100) + "%");}
+    el("line", {x1: L, x2: W - Rr, y1: y(.9), y2: y(.9), class: "thr"}, svg);
+    el("text", {x: W - Rr, y: y(.9) - 6, "text-anchor": "end"}, svg, "90%");
+    share.forEach((s, i) => {
+      const x = L + i*bw + bw*.2, w = bw*.6, top = y(s);
+      el("path", {d: `M${x},${y(0)} V${top + 4} Q${x},${top} ${x + 4},${top} H${x + w - 4} Q${x + w},${top} ${x + w},${top + 4} V${y(0)} Z`, class: i < k ? "kept" : "dropped", opacity: hovered === -1 || hovered === i ? 1 : .55}, svg);
+      el("text", {x: x + w/2, y: top - 6, "text-anchor": "middle", class: "val"}, svg, fmt(100*s, 1) + "%");
+      el("text", {x: x + w/2, y: H - B + 18, "text-anchor": "middle"}, svg, "PC" + (i + 1));
+    });
+    let dpath = ""; cum.forEach((v, i) => {const cx = L + i*bw + bw/2; dpath += (i ? "L" : "M") + cx + "," + y(v);});
+    el("path", {d: dpath, class: "cum"}, svg);
+    cum.forEach((v, i) => el("circle", {cx: L + i*bw + bw/2, cy: y(v), r: 4.5, class: "cumdot"}, svg));
+    el("text", {x: L + (d - 1)*bw + bw/2, y: y(cum[d - 1]) - 10, "text-anchor": "middle"}, svg, "total");
+    share.forEach((s, i) => {
+      const h = el("rect", {x: L + i*bw, y: T, width: bw, height: ph, class: "hit", tabindex: 0, role: "button", "aria-label": `PC${i + 1}: ${fmt(100*s, 1)}% of variance, ${fmt(100*cum[i], 1)}% cumulative`}, svg);
+      h.addEventListener("pointerenter", () => {if (hovered !== i){hovered = i; done("scree-2"); coach(); paintOnly();}});
+      h.addEventListener("pointerleave", () => {hovered = -1; coach(); paintOnly();});
+      h.addEventListener("focus", () => {if (hovered !== i){hovered = i; done("scree-2"); coach(); paintOnly();}});
+      h.addEventListener("blur", () => {hovered = -1; coach(); paintOnly();});
+      h.addEventListener("click", () => {slider.value = i + 1; update();});
+      h.addEventListener("keydown", e => {if (e.key === "Enter" || e.key === " "){e.preventDefault(); slider.value = i + 1; update();}});
+    });
+  }
+  function paintOnly(){
+    const k = +slider.value;
+    svg.querySelectorAll("path.kept, path.dropped").forEach((p, i) => {p.setAttribute("class", i < k ? "kept" : "dropped"); p.setAttribute("opacity", hovered === -1 || hovered === i ? 1 : .55);});
+  }
+  function coach(){
+    const k = +slider.value, c = $("#scree-coach");
+    let msg = `Keeping <strong>${k} of 6</strong> components keeps <strong>${pct(cum[k - 1], 1)}</strong> of the variance.`;
+    if (hovered >= 0) msg = `PC${hovered + 1} explains <strong>${pct(share[hovered], 1)}</strong> on its own. Up to PC${hovered + 1}, the running total is ${pct(cum[hovered], 1)}.`;
+    else if (k === kStar){done("scree-1"); msg += ` That is the smallest number that clears 90%. Six columns became ${k}. The data was built from two hidden factors, and PCA found them.`;}
+    else if (cum[k - 1] < .9) msg += ` Not yet at 90%. Add a component.`;
+    else msg += ` Above 90%, but could you drop one and still clear it?`;
+    c.innerHTML = msg;
+  }
+  function update(){out.textContent = slider.value; render(); coach();}
+  slider.addEventListener("input", () => {hovered = -1; update();});
+  // loadings table
+  const lt = $("#scree-load");
+  lt.innerHTML = `<thead><tr><th>Feature</th><th>PC1</th><th>PC2</th></tr></thead><tbody>` + NAMES.map((nm, j) => {
+    const a = eig[0].vec[j], b = eig[1].vec[j];
+    const cell = v => `<td><span style="display:inline-block;width:${Math.round(Math.abs(v)*44)}px;height:8px;border-radius:2px;margin-right:6px;vertical-align:0;background:${v >= 0 ? "var(--pos)" : "var(--neg)"}"></span>${fmt(v, 2)}</td>`;
+    return `<tr><td>${nm}</td>${cell(a)}${cell(b)}</tr>`;
+  }).join("") + `</tbody>`;
+  // heatmap
+  const hs = $("#heat"), hl = 112, ht = 92, cs = 62;
+  hs.setAttribute("viewBox", `0 0 ${hl + cs*d + 120} ${ht + cs*d + 10}`);
+  el("text", {x: hl, y: 16, style: "font-weight:650;fill:var(--ink);font-size:14px"}, hs, "Correlation matrix of the car features");
+  NAMES.forEach((nm, i) => {
+    el("text", {x: hl - 10, y: ht + i*cs + cs/2 + 4, "text-anchor": "end"}, hs, nm);
+    const tx = hl + i*cs + cs/2, ty = ht - 10;
+    el("text", {x: tx, y: ty, "text-anchor": "start", transform: `rotate(-35 ${tx} ${ty})`}, hs, nm);
+  });
+  for (let i = 0; i < d; i++) for (let j = 0; j < d; j++){
+    const v = R[i][j], m = Math.round(Math.abs(v)*80);
+    const g = el("rect", {x: hl + j*cs + 1, y: ht + i*cs + 1, width: cs - 2, height: cs - 2, rx: 4, style: `fill:color-mix(in oklab, var(${v >= 0 ? "--pos" : "--neg"}) ${m}%, var(--plate))`}, hs);
+    el("title", {}, g, `${NAMES[i]} and ${NAMES[j]}: r = ${fmt(v, 2)}`);
+    el("text", {x: hl + j*cs + cs/2, y: ht + i*cs + cs/2 + 4, "text-anchor": "middle", style: `font-weight:600;fill:${Math.abs(v) > .62 ? "var(--plate)" : "var(--ink)"}`}, hs, fmt(v, 2));
+  }
+  // legend
+  const lx = hl + cs*d + 22;
+  [["−1", -1], ["0", 0], ["+1", 1]].forEach(([t, v], i) => {
+    el("rect", {x: lx, y: ht + i*36, width: 20, height: 20, rx: 3, style: `fill:color-mix(in oklab, var(${v >= 0 ? "--pos" : "--neg"}) ${Math.abs(v)*80}%, var(--plate));stroke:var(--rule)`}, hs);
+    el("text", {x: lx + 28, y: ht + i*36 + 14}, hs, t);
+  });
+  update();
+})();
+
+/* ================= quiz ================= */
+(() => {
+  const Q = [
+    {q: "You run covariance-based PCA on height (cm) and weight (kg), then switch height to millimeters. What happens?",
+     o: ["Nothing changes; PCA ignores units", "PC1 leans much more toward height", "PC1 leans much more toward weight"], a: 1,
+     why: "Height's variance grows 100×, so covariance-based PCA chases it. Standardize first, or use the correlation matrix, to avoid this."},
+    {q: "What does an eigenvalue of the covariance matrix tell you?",
+     o: ["The angle of its principal component", "How much variance the data has along that eigenvector", "The correlation between two features"], a: 1,
+     why: "Each eigenvalue is the variance of the shadows on its eigenvector. Their sum equals the total variance."},
+    {q: "How are PC1 and PC2 always oriented relative to each other?",
+     o: ["At 45°", "Perpendicular, at 90°", "It depends on the data"], a: 1,
+     why: "Eigenvectors of a symmetric matrix like C are perpendicular. That is why the shortest shadow sat exactly 90° from the longest."},
+    {q: "Every entry of a correlation matrix lies between…",
+     o: ["0 and 1", "−1 and 1", "Any two numbers, depending on the units"], a: 1,
+     why: "Dividing by both standard deviations removes the units and bounds the value. The diagonal is always exactly 1."}
+  ];
+  const root = $("#quiz");
+  Q.forEach((item, qi) => {
+    const box = document.createElement("div"); box.className = "q";
+    box.innerHTML = `<p class="ask" id="q${qi}">${qi + 1}. ${item.q}</p><div class="opts" role="group" aria-labelledby="q${qi}"></div><p class="fb" aria-live="polite"></p>`;
+    const opts = $(".opts", box), fb = $(".fb", box);
+    item.o.forEach((t, oi) => {
+      const b = document.createElement("button"); b.type = "button"; b.textContent = t;
+      b.addEventListener("click", () => {
+        $$("button", opts).forEach(x => x.classList.remove("right", "wrong"));
+        if (oi === item.a){b.classList.add("right"); fb.innerHTML = `<strong>Right.</strong> ${item.why}`;}
+        else {b.classList.add("wrong"); fb.innerHTML = `Not quite. Try another option.`;}
+      });
+      opts.appendChild(b);
+    });
+    root.appendChild(box);
+  });
+})();
+
+buildRail();
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(retheme);
+</script>
+</body>
+</html>
